@@ -2,7 +2,8 @@
 
 A Pythonic framework for building AI agents and LLM pipelines, powered by [pydantic-ai](https://github.com/pydantic/pydantic-ai). The framework emphasizes simplicity and maintainability without sacrificing power, making it an ideal choice for both rapid prototyping.
 
-> ⚠️ **Pre-alpha Status**: Agenty is under active development. Expect frequent breaking changes until we reach a stable release.
+> [!Caution]
+> **Initial Development**: Agenty is under active development. Expect frequent breaking changes until we reach a stable release.
 
 Agenty provides a clean, type-safe interface for creating:
 - Conversational AI agents with structured inputs and outputs
@@ -19,7 +20,8 @@ Agenty provides a clean, type-safe interface for creating:
 Whether you're building a simple chatbot or a complex multi-agent system, Agenty helps you focus on logic rather than infrastructure.
 The framework is currently only officially supported with the OpenAI API (through a proxy such as [LiteLLM](https://docs.litellm.ai/docs/simple_proxy)/[OpenRouter](https://openrouter.ai/docs/quick-start)) although theoretically it supports all the models supported by pydantic-ai.
 
-> 🔍 Looking for a more mature alternative? Check out [atomic-agents](https://github.com/BrainBlend-AI/atomic-agents), which heavily inspired this project.
+> [!TIP]
+> Looking for a more mature alternative? Check out [atomic-agents](https://github.com/BrainBlend-AI/atomic-agents), which heavily inspired this project.
 
 ## Installation
 
@@ -78,7 +80,9 @@ asyncio.run(main())
 
 Agenty uses [Jinja templates](https://jinja.palletsprojects.com/en/stable/templates/) to create dynamic prompts and messages by automatically populating template variables.
 
-> 💡 Any attribute of your agent object that starts with a capital letter is automatically added to the template context. Agenty prefers to use template variables in `ALL_CAPS` formatting for better visibility. 
+
+> [!TIP]
+> Any attribute of your agent object that starts with a capital letter is automatically added to the template context. Agenty prefers to use template variables in `ALL_CAPS` formatting for better visibility. 
 > 
 > If you need to modify this default behavior, you can override the `template_context()` method in your custom agent class.
 
