@@ -136,14 +136,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             usage=self.usage[self.model_name],
         )
 
-        for msg in result.all_messages():
-            debug(msg)
-            # logger.debug(
-            #     {
-            #         "agent": type(self).__name__,
-            #         "msg": msg,
-            #     }
-            # )
         self.memory.add("assistant", result.data)
         return cast(AgentOutputT, result.data)
 
