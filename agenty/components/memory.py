@@ -1,4 +1,3 @@
-from textwrap import dedent
 from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable
 from collections.abc import MutableSequence
 import uuid
@@ -14,7 +13,7 @@ from pydantic_ai.messages import (
     TextPart,
 )
 from agenty.template import apply_template
-from agenty.types import AgentIO, BaseIO
+from agenty.types import AgentIO
 
 __all__ = ["ChatMessage", "AgentMemory", "Role"]
 
