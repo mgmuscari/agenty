@@ -1,4 +1,5 @@
-from typing import Optional, Literal, Union, Sequence, overload, Iterable
+from textwrap import dedent
+from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable
 from collections.abc import MutableSequence
 import uuid
 
@@ -12,6 +13,7 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     TextPart,
 )
+from agenty.template import apply_template
 from agenty.types import AgentIO, BaseIO
 
 Role = Literal["user", "assistant", "tool", "system", "developer", "function"]
@@ -32,9 +34,13 @@ class ChatMessage(BaseModel):
     turn_id: Optional[str] = None
     name: Optional[str] = None
 
-    def to_openai(self) -> ChatCompletionMessageParam:
+    def content_str(self, ctx: dict[str, Any] = {}) -> str:
+        """Get message content as a string and render Jinja2 template."""
+        return apply_template(self.content, ctx)
+
+    def to_openai(self, ctx: dict[str, Any] = {}) -> ChatCompletionMessageParam:
         """Convert message to OpenAI API format."""
-        content = self.content
+        content = self.content_str(ctx)
         if isinstance(content, BaseModel):
             content = content.model_dump_json()
         return {
@@ -43,15 +49,15 @@ class ChatMessage(BaseModel):
             "name": str(self.name),
         }
 
-    def to_pydantic_ai(self) -> ModelMessage:
+    def to_pydantic_ai(self, ctx: dict[str, Any] = {}) -> ModelMessage:
         """Convert message to Pydantic AI format."""
         match self.role:
             case "user":
-                return ModelRequest(parts=[UserPromptPart(str(self.content))])
+                return ModelRequest(parts=[UserPromptPart(self.content_str(ctx))])
             case "system":
-                return ModelRequest(parts=[SystemPromptPart(str(self.content))])
+                return ModelRequest(parts=[SystemPromptPart(self.content_str(ctx))])
             case "assistant":
-                return ModelResponse(parts=[TextPart(str(self.content))])
+                return ModelResponse(parts=[TextPart(self.content_str(ctx))])
             case _:
                 raise ValueError(f"Unsupported role: {self.role}")
 
@@ -152,10 +158,10 @@ class AgentMemory(MutableSequence[ChatMessage]):
         self._messages.insert(index, value)
         self._cull_history()
 
-    def to_openai(self) -> list[ChatCompletionMessageParam]:
+    def to_openai(self, ctx: dict[str, Any] = {}) -> list[ChatCompletionMessageParam]:
         """Get history in OpenAI API format."""
-        return [msg.to_openai() for msg in self._messages]
+        return [msg.to_openai(ctx) for msg in self._messages]
 
-    def to_pydantic_ai(self) -> list[ModelMessage]:
+    def to_pydantic_ai(self, ctx: dict[str, Any] = {}) -> list[ModelMessage]:
         """Get history in Pydantic-AI format."""
-        return [msg.to_pydantic_ai() for msg in self._messages]
+        return [msg.to_pydantic_ai(ctx) for msg in self._messages]

@@ -1,4 +1,4 @@
-from typing import Any, List, Callable, Union, Optional, cast, Generic
+from typing import Any, Dict, List, Callable, Union, Optional, cast, Generic
 from functools import wraps
 import logging
 from typing import Type
@@ -9,8 +9,9 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.tools import RunContext
 
 from agenty.components.memory import AgentMemory, ChatMessage
-from agenty.types import AgentInputT, AgentOutputT, AgentIO
 from agenty.components.usage import AgentUsage, AgentUsageLimits
+from agenty.template import apply_template
+from agenty.types import AgentInputT, AgentOutputT, AgentIO
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +115,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 end_strategy=end_strategy,
             )
 
-    @property
-    def pai_agent(self) -> pai.Agent["Agent[Any, Any]", AgentIO]:
-        return self._pai_agent
-
     async def run(
         self,
         input_data: AgentInputT,
@@ -127,10 +124,11 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
-        ).to_pydantic_ai()
+        ).to_pydantic_ai(ctx=self.template_context())
         result = await self.pai_agent.run(
             str(input_data),
-            message_history=[system_prompt] + self.memory.to_pydantic_ai(),
+            message_history=[system_prompt]
+            + self.memory.to_pydantic_ai(ctx=self.template_context()),
             deps=self,
             usage_limits=self.usage_limits[self.model_name],
             usage=self.usage[self.model_name],
@@ -138,6 +136,17 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         self.memory.add("assistant", result.data)
         return cast(AgentOutputT, result.data)
+
+    def render_system_prompt(self) -> str:
+        return apply_template(self.system_prompt, self.template_context())
+
+    def template_context(self) -> Dict[str, Any]:
+        """Get a dictionary of instance variables for use in templates. Exclude methods and include only those that start with a capital letter."""
+        return {
+            key: value
+            for key, value in vars(self).items()
+            if key[0].isupper() and not callable(value)
+        }
 
     @property
     def model_name(self) -> str:
@@ -150,3 +159,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             model_name = self.pai_agent.model.name()
 
         return model_name
+
+    @property
+    def pai_agent(self) -> pai.Agent["Agent[Any, Any]", AgentIO]:
+        return self._pai_agent

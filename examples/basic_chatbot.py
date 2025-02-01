@@ -19,18 +19,26 @@ OPENAI_API_URL = os.getenv("OPENAI_API_URL", "http://127.0.0.1:4000")
 # import logging
 # logging.basicConfig()
 # logging.getLogger("agenty").setLevel(logging.DEBUG)
+class ChatAgent(Agent[str, str]):
+    input_schema = str
+    output_schema = str
+    model = OpenAIModel(
+        "gpt-4o-mini",
+        base_url=OPENAI_API_URL,
+        api_key=OPENAI_API_KEY,
+    )
+    system_prompt = (
+        "You are a helpful and friendly AI assistant named {{ AGENT_NAME }}."
+    )
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.AGENT_NAME: str = "Agenty"
 
 
 async def main() -> None:
     console = Console()
-    agent = Agent(
-        model=OpenAIModel(
-            "gpt-4o-mini",
-            base_url=OPENAI_API_URL,
-            api_key=OPENAI_API_KEY,
-        ),
-        system_prompt="You are a helpful and friendly AI assistant.",
-    )
+    agent = ChatAgent()
     console.print("Basic Chatbot | Type /exit or /quit to exit")
     user_prompt = "\033[1;36mUser: \033[0m"  # Use raw ANSI code here because console.input() doesn't work correctly with chat history
     while True:
