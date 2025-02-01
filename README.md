@@ -12,10 +12,9 @@ Agenty provides a clean, type-safe interface for creating:
 ## Key Features
 - Intuitive Pythonic interfaces that feel natural to use
 - Jinja2 templates for prompts and messages for dynamic context
-- Conversation history management
+- Automatic conversation history management
 - Structured Agent I/O for predictable behavior
-- Flexible architecture supporting diverse use cases
-- Built on pydantic-ai for robust type validation
+- Built on pydantic-ai for type validation
 
 Whether you're building a simple chatbot or a complex multi-agent system, Agenty helps you focus on logic rather than infrastructure.
 The framework is currently only officially supported with the OpenAI API (through a proxy such as [LiteLLM](https://docs.litellm.ai/docs/simple_proxy)/[OpenRouter](https://openrouter.ai/docs/quick-start)) although theoretically it supports all the models supported by pydantic-ai.
@@ -46,7 +45,7 @@ from agenty import Agent
 async def main():
     agent = Agent(
         model=OpenAIModel(
-            "gpt-4",
+            "gpt-4o",
             api_key="your-api-key"
         ),
         system_prompt="You are a helpful and friendly AI assistant."
@@ -59,10 +58,11 @@ asyncio.run(main())
 ```
 In most cases, to build a custom AI agent, you'll want to create your own class that inherits from `Agent.` The below is functionally equivalent to the above code (and is the recommended way to use this framework)
 ```python
+import asyncio
 from agenty import Agent
 
 class Assistant(Agent):
-    model = OpenAIModel("gpt-4", api_key="your-api-key")
+    model = OpenAIModel("gpt-4o", api_key="your-api-key")
     system_prompt = "You are a helpful and friendly AI assistant."
 
 async def main():
@@ -72,6 +72,44 @@ async def main():
 
 asyncio.run(main())
 ```
+---
+
+### Templates
+
+Agenty uses [Jinja templates](https://jinja.palletsprojects.com/en/stable/templates/) to create dynamic prompts and messages by automatically populating template variables.
+
+> 💡 Any attribute of your agent object that starts with a capital letter is automatically added to the template context. Agenty prefers to use template variables in `ALL_CAPS` formatting for better visibility. 
+> 
+> If you need to modify this default behavior, you can override the `template_context()` method in your custom agent class.
+
+```python
+import asyncio
+from agenty import Agent
+from pydantic_ai.models.openai import OpenAIModel
+
+class Greeter(Agent):
+    model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
+    system_prompt = """You are a greeter. You speak in a {{TONE}} tone. Your response length should be {{ VERBOSITY }}. """
+    TONE: str = "friendly"
+    VERBOSITY: str = "verbose"
+
+async def main():
+    agent = Greeter()
+    response = await agent.run("Hello, please greet me!")
+    print(response)
+    agent.TONE = "angry"
+    agent.VERBOSITY = "concise"
+    response = await agent.run("Hello, please greet me!")
+    print(response)
+    # Sample Output:
+    # Good day! It's so good to see you. How may I assist you further?
+    # What do you want?!
+asyncio.run(main())
+```
+
+Templates can be used in both system prompts and user messages, making it easy to create dynamic and evolving interactions. 
+
+---
 
 ### Tool Usage
 Agenty provides a framework for building custom agents that can leverage functions as tools through a simple decorator pattern.
@@ -92,7 +130,7 @@ from pydantic_ai.models.openai import OpenAIModel
 
 
 class RouletteAgent(Agent):
-    model = OpenAIModel("gpt-4", api_key="your-api-key")
+    model = OpenAIModel("gpt-4o", api_key="your-api-key")
     system_prompt = "You're a dice game, you should roll the die and see if the number matches the user's guess."
 
     def __init__(self, player_name: str, num_sides: int = 10, **kwargs):
@@ -124,6 +162,7 @@ asyncio.run(main())
 
 You can read more about [function tools](https://ai.pydantic.dev/tools/) by pydantic-ai. (underlying implementation of agenty tools)
 
+---
 
 ### Structured Input/Output
 Agenty supports structured input and output types through pydantic models (inherit from `agenty.types.BaseIO`). This enables type-safe interactions with your agents. 
@@ -131,6 +170,7 @@ Agenty supports structured input and output types through pydantic models (inher
 Here's an example that extracts user information from text:
 
 ```python
+import asyncio
 from typing import List
 from pydantic_ai.models.openai import OpenAIModel
 from agenty import Agent
@@ -144,7 +184,7 @@ class User(BaseIO):
 class UserExtractor(Agent[str, List[User]]): # Generics are used for static type-checking
     input_schema = str  # Controls input type
     output_schema = List[User]  # Controls output type
-    model = OpenAIModel("gpt-4", api_key="your-api-key")
+    model = OpenAIModel("gpt-4o", api_key="your-api-key")
     system_prompt = "Extract all user information"
 
 async def main():
@@ -182,6 +222,7 @@ asyncio.run(main())
 # Hobbies: fitness coaching, working out
 ```
 
+---
 ## Configuration
 
 Custom agents can be customized with the following class attributes. The imports have been included below as well for convenience. The settings get passed along to the pydantic-ai agent that powers everything.
@@ -205,6 +246,7 @@ class CustomAgent(Agent):
     end_strategy: EndStrategy
 ```
 
+---
 ## Requirements
 
 - Python >= 3.12
