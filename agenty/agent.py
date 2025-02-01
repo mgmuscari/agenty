@@ -1,4 +1,15 @@
-from typing import Any, Dict, List, Callable, Union, Optional, cast, Generic, Type
+from typing import (
+    cast,
+    Any,
+    Dict,
+    List,
+    Callable,
+    Union,
+    Optional,
+    Generic,
+    Type,
+    AsyncIterator,
+)
 import logging
 
 import pydantic_ai as pai
@@ -186,6 +197,27 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         self.memory.add("assistant", result.data)
         return cast(AgentOutputT, result.data)
+
+    async def run_stream(
+        self,
+        input_data: AgentInputT,
+    ) -> AsyncIterator[AgentOutputT]:
+        self.memory.add("user", input_data)
+
+        system_prompt = ChatMessage(
+            role="system", content=self.system_prompt
+        ).to_pydantic_ai(ctx=self.template_context())
+
+        async with self.pai_agent.run_stream(
+            str(input_data),
+            message_history=[system_prompt]
+            + self.memory.to_pydantic_ai(ctx=self.template_context()),
+            deps=self,
+            usage_limits=self.usage_limits[self.model_name],
+            usage=self.usage[self.model_name],
+        ) as result:
+            async for message in result.stream():
+                yield cast(AgentOutputT, message)
 
     def render_system_prompt(self) -> str:
         """Render the system prompt with the current template context.

@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Type
+from typing import Union, Sequence, Type, TypedDict
 from typing_extensions import TypeVar
 
 from pydantic import BaseModel
@@ -44,6 +44,7 @@ AgentIOBase = Union[
     int,
     float,
     str,
+    TypedDict,
     BaseIO,
 ]
 """Union type for basic agent I/O types.

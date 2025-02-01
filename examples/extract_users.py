@@ -1,23 +1,17 @@
-from types import FrameType
-from typing import Optional, List
+from typing import List
 import asyncio
-import atexit
+import logging
 import os
-import random
-import readline
-import signal
 
-from pydantic import BaseModel
 from pydantic_ai.models.openai import OpenAIModel
 from rich.console import Console
 
-from agenty import Agent, tool
+from agenty import Agent
 from agenty.types import BaseIO
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-1234")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "http://127.0.0.1:4000")
 
-import logging
 
 logging.basicConfig()
 logging.getLogger("agenty").setLevel(logging.DEBUG)
@@ -88,6 +82,4 @@ async def main() -> None:
     # Age: 30
     # Hobbies: fitness coaching, working out
 
-
-if __name__ == "__main__":
     asyncio.run(main())
