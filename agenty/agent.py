@@ -1,11 +1,9 @@
 from typing import Any, Dict, List, Callable, Union, Optional, cast, Generic, Type
-from functools import wraps
 import logging
 
 import pydantic_ai as pai
 from pydantic_ai.agent import EndStrategy
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
-from pydantic_ai.tools import RunContext
 
 from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
@@ -66,7 +64,7 @@ class AgentMeta(type):
                     {
                         "tool": tool.__name__,
                         "agent": cls.__name__,
-                        "msg": f"Added tool to agent",
+                        "msg": "added tool to agent",
                     }
                 )
         except Exception:
@@ -173,7 +171,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             The processed output data
         """
         self.memory.add("user", input_data)
-        from devtools import debug
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt

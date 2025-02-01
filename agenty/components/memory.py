@@ -145,6 +145,10 @@ class AgentMemory(MutableSequence[ChatMessage]):
         )
         self.append(message)
 
+    def clear(self) -> None:
+        self.current_turn_id = None
+        return super().clear()
+
     def _cull_history(self) -> None:
         """Remove oldest messages if exceeding max_messages.
 
