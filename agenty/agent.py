@@ -8,9 +8,9 @@ from pydantic_ai.agent import EndStrategy
 from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.tools import RunContext
 
-from agenty.memory import AgentMemory, ChatMessage
+from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.types import AgentInputT, AgentOutputT, AgentIO
-from agenty.usage import AgentUsage, AgentUsageLimits
+from agenty.components.usage import AgentUsage, AgentUsageLimits
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,6 @@ class AgentMeta(type):
 
 
 class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
-    memory: AgentMemory
     model: Union[KnownModelName, Model] = "gpt-4o"
     system_prompt: str = ""
     model_settings: Optional[ModelSettings]
@@ -86,7 +85,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         usage: Optional[AgentUsage] = None,
         usage_limits: Optional[AgentUsageLimits] = None,
     ) -> None:
-        self.system_prompt = system_prompt
+        if system_prompt:
+            self.system_prompt = system_prompt
         self.memory = memory or AgentMemory()
         self.usage = usage or AgentUsage()
         self.usage_limits = usage_limits or AgentUsageLimits()
@@ -123,6 +123,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         input_data: AgentInputT,
     ) -> AgentOutputT:
         self.memory.add("user", input_data)
+        from devtools import debug
+
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
         ).to_pydantic_ai()
@@ -133,13 +135,15 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             usage_limits=self.usage_limits[self.model_name],
             usage=self.usage[self.model_name],
         )
-        for msg in result.new_messages():
-            logger.debug(
-                {
-                    "agent": type(self).__name__,
-                    "msg": msg,
-                }
-            )
+
+        for msg in result.all_messages():
+            debug(msg)
+            # logger.debug(
+            #     {
+            #         "agent": type(self).__name__,
+            #         "msg": msg,
+            #     }
+            # )
         self.memory.add("assistant", result.data)
         return cast(AgentOutputT, result.data)
 

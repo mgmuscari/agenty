@@ -5,7 +5,7 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from pydantic_ai.agent import EndStrategy
 
 from agenty.types import AgentIO
-from agenty.usage import AgentUsage, AgentUsageLimits
+from agenty.components.usage import AgentUsage, AgentUsageLimits
 
 
 @dataclass

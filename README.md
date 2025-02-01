@@ -84,7 +84,12 @@ Agenty provides a framework for building custom agents that can leverage functio
 
 Here's an example of a roulette game agent:
 ```python
+import asyncio
+import random
+
 from agenty import Agent, tool
+from pydantic_ai.models.openai import OpenAIModel
+
 
 class RouletteAgent(Agent):
     model = OpenAIModel("gpt-4", api_key="your-api-key")
@@ -103,40 +108,43 @@ class RouletteAgent(Agent):
     @tool
     def roll_die(self) -> int:
         """Roll a n-sided die and return the result."""
-        return random.randint(1, self.num_sides)
+        num = random.randint(1, self.num_sides)
+        print(f"Rolled a {num}!")
+        return num
+
 
 async def main():
     agent = RouletteAgent(player_name="John", num_sides=6)
     response = await agent.run("I guess the number will be 3!")
     print(response)
 
-asyncio.run(main())
 
+asyncio.run(main())
 ```
 You can read more about [function tools](https://ai.pydantic.dev/tools/) by pydantic-ai. (underlying implementation of agenty tools)
 
-## Key Features
-
-- **Easy Agent Creation**: Create AI agents with just a few lines of code
-- **Memory Management**: Built-in conversation memory tracking
-- **Custom Tools**: Add custom capabilities to your agents using the `@tool` decorator
-- **Usage Tracking**: Monitor and limit API usage
-- **Type Safety**: Built with Pydantic for robust type checking
-- **Flexible Models**: Support for various LLM providers through pydantic-ai
-- **Async Support**: Built for asynchronous operations
 
 ## Configuration
 
-Agents can be configured with various options:
+Custom agents can be customized with the following class attributes. The imports have been included below as well for convenience.
 
 ```python
-agent = Agent(
-    model="gpt-4",                    # Model to use
-    system_prompt="Your prompt here", # System prompt for the agent
-    retries=3,                       # Number of retries for failed requests
-    memory=AgentMemory(),           # Custom memory implementation
-    usage_limits=AgentUsageLimits() # Usage limits configuration
-)
+from typing import Optional, Union, Type
+
+from agenty import Agent
+from agenty.types import AgentIO
+from pydantic_ai.agent import EndStrategy
+from pydantic_ai.models import KnownModelName, Model, ModelSettings
+
+class CustomAgent(Agent):
+    model: Union[KnownModelName, Model] = "gpt-4o"
+    system_prompt: str = ""
+    model_settings: Optional[ModelSettings]
+    input_schema: Type[AgentIO]
+    output_schema: Type[AgentIO]
+    retries: int
+    result_retries: Optional[int]
+    end_strategy: EndStrategy
 ```
 
 ## Requirements
