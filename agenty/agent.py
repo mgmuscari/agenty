@@ -204,11 +204,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         Returns:
             Dict[str, Any]: Dictionary of variables
         """
-        return {
-            key: value
-            for key, value in vars(self).items()
-            if key[0].isupper() and not callable(value)
-        }
+        return {key: getattr(self, key) for key in dir(self) if key[0].isupper()}
 
     @property
     def model_name(self) -> str:
