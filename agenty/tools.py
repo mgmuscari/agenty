@@ -1,30 +1,48 @@
 from functools import wraps
 import logging
-from typing import Callable
+from typing import cast, Any, Callable, Concatenate
 
-from pydantic_ai.tools import RunContext
+from pydantic_ai.tools import RunContext, ToolParams
 
 from agenty.agent import Agent
 from agenty.types import AgentInputT, AgentOutputT
 
 logger = logging.getLogger(__name__)
 
+# TODO: Do more research...
+# https://stackoverflow.com/questions/19314405/how-to-detect-if-decorator-has-been-applied-to-method-or-function
 
-def tool(func: Callable) -> Callable:
+
+def tool(
+    func: Callable[ToolParams, AgentOutputT]
+) -> Callable[ToolParams, AgentOutputT]:
     setattr(func, "_is_tool", True)
 
     @wraps(func)
-    def wrapper(ctx: RunContext[Agent[AgentInputT, AgentOutputT]], *args, **kwargs):
+    def wrapper(
+        ctx: RunContext[Agent[AgentInputT, AgentOutputT]], *args, **kwargs
+    ) -> Any:
         self = ctx.deps
+        _func: Callable[
+            Concatenate[Agent[AgentInputT, AgentOutputT], ToolParams],
+            AgentOutputT,
+        ] = cast(
+            Callable[
+                Concatenate[Agent[AgentInputT, AgentOutputT], ToolParams],
+                AgentOutputT,
+            ],
+            func,
+        )
+        result = _func(self, *args, **kwargs)
         logger.debug(
             {
                 "tool": func.__name__,
-                "agent": type(self).__name__,
-                "msg": f"Called tool",
+                "result": result,
                 "args": args,
                 "kwargs": kwargs,
+                "agent": type(self).__name__,
             }
         )
-        return func(self, *args, **kwargs)
+        return result
 
     return wrapper
