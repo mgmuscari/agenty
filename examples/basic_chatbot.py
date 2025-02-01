@@ -3,7 +3,6 @@ from typing import Optional
 import asyncio
 import atexit
 import os
-import random
 import readline
 import signal
 
