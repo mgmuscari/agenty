@@ -1,14 +1,14 @@
 from typing import (
-    cast,
     Any,
-    Dict,
-    List,
-    Callable,
-    Union,
-    Optional,
-    Generic,
-    Type,
     AsyncIterator,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Type,
+    Union,
+    cast,
 )
 import logging
 
@@ -18,9 +18,9 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 
 from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
-from agenty.template import apply_template
-from agenty.types import AgentInputT, AgentOutputT, AgentIO
 from agenty.exceptions import AgentyValueError
+from agenty.template import apply_template
+from agenty.types import AgentIO, AgentInputT, AgentOutputT
 
 __all__ = ["Agent"]
 
@@ -89,6 +89,15 @@ class AgentMeta(type):
         return cls
 
 
+class NOT_GIVEN:
+    """Sentinel class used to distinguish between unset and None values."""
+
+    ...
+
+
+NOT_GIVEN_ = NOT_GIVEN()
+
+
 class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     """Base class for creating AI agents with specific input and output types.
 
@@ -119,14 +128,14 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
     def __init__(
         self,
-        model: Union[KnownModelName, Model] = "gpt-4o",
+        model: Union[KnownModelName, Model] | NOT_GIVEN = NOT_GIVEN_,
+        model_settings: Optional[ModelSettings] | NOT_GIVEN = NOT_GIVEN_,
+        input_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
+        output_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
+        retries: int | NOT_GIVEN = NOT_GIVEN_,
+        result_retries: Optional[int] | NOT_GIVEN = NOT_GIVEN_,
+        end_strategy: EndStrategy | NOT_GIVEN = NOT_GIVEN_,
         system_prompt: str = "",
-        model_settings: Optional[ModelSettings] = None,
-        input_schema: Type[AgentIO] = str,
-        output_schema: Type[AgentIO] = str,
-        retries: int = 1,
-        result_retries: Optional[int] = None,
-        end_strategy: EndStrategy = "early",
         name: Optional[str] = None,
         memory: Optional[AgentMemory] = None,
         usage: Optional[AgentUsage] = None,
@@ -136,12 +145,12 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         Args:
             model: The AI model to use
-            system_prompt: System prompt for the agent
             model_settings: Model-specific settings
             input_schema: Input validation schema
             output_schema: Output validation schema
             retries: Number of retries for failed runs
             result_retries: Number of retries for result parsing
+            system_prompt: System prompt for the agent
             end_strategy: Strategy for ending conversations
             memory: Memory component for storing conversation history
             usage: Usage tracking component
@@ -154,27 +163,41 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         self.usage_limits = usage_limits or AgentUsageLimits()
         self.name = name or self.__class__.__name__
 
-        # If any of the following attributes are set, recreate the pydantic-ai agent for the entire class
-        if any(
-            [
-                model != "gpt-4o",
-                model_settings is not None,
-                input_schema is not str,
-                output_schema is not str,
-                retries != 1,
-                result_retries is not None,
-                end_strategy != "early",
-            ]
-        ):
-            logger.debug("Recreating pydantic-ai agent")
-            self.__class__._pai_agent = pai.Agent(
-                model,
-                result_type=output_schema or str,
+        # Update instance attributes if provided
+        _regenerate_pai_agent = False
+        if not isinstance(model, NOT_GIVEN):
+            self.model = model
+            _regenerate_pai_agent = True
+        if not isinstance(model_settings, NOT_GIVEN):
+            self.model_settings = model_settings
+            _regenerate_pai_agent = True
+        if not isinstance(input_schema, NOT_GIVEN):
+            self.input_schema = input_schema
+            _regenerate_pai_agent = True
+        if not isinstance(output_schema, NOT_GIVEN):
+            self.output_schema = output_schema
+            _regenerate_pai_agent = True
+        if not isinstance(retries, NOT_GIVEN):
+            self.retries = retries
+            _regenerate_pai_agent = True
+        if not isinstance(result_retries, NOT_GIVEN):
+            self.result_retries = result_retries
+            _regenerate_pai_agent = True
+        if not isinstance(end_strategy, NOT_GIVEN):
+            self.end_strategy = end_strategy
+            _regenerate_pai_agent = True
+
+        # If any attributes were updated, recreate the pydantic-ai agent
+        if _regenerate_pai_agent:
+            logger.debug("Creating object-specific pydantic-ai agent")
+            self._pai_agent = pai.Agent(
+                self.model,
+                result_type=self.output_schema,
                 deps_type=self.__class__,
-                model_settings=model_settings,
-                retries=retries,
-                result_retries=result_retries,
-                end_strategy=end_strategy,
+                model_settings=self.model_settings,
+                retries=self.retries,
+                result_retries=self.result_retries,
+                end_strategy=self.end_strategy,
             )
 
     async def run(
@@ -202,7 +225,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             deps=self,
             usage_limits=self.usage_limits[self.model_name],
             usage=self.usage[self.model_name],
-            # result_type=self.output_schema,  # doing this allows the result schema to be None which supports raw text responses
+            # Note: Omitting result_type allows None schema which enables raw text responses
         )
         if result.data is None:
             raise AgentyValueError("No data returned from agent")
@@ -229,7 +252,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             usage=self.usage[self.model_name],
         ) as result:
             async for message in result.stream():
-                # this is definitely broken because it never adds to agent's memory but I'm not sure when to add it
+                # TODO: Add to agent's memory at appropriate point in stream
                 yield cast(AgentOutputT, message)
 
     def render_system_prompt(self) -> str:
@@ -264,7 +287,11 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         if isinstance(self.pai_agent.model, str):
             model_name = self.pai_agent.model
         else:
-            model_name = self.pai_agent.model.name()
+            model_name = getattr(
+                self.pai_agent.model,
+                "model_name",
+                self.pai_agent.model.name(),
+            )
 
         return model_name
 
