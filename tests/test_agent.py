@@ -1,9 +1,13 @@
-import pytest
 from typing import TypedDict
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 import pydantic_ai as pai
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.result import RunResult
 
 from agenty import Agent
+from agenty.exceptions import AgentyValueError
 from agenty.types import BaseIO
 
 
@@ -94,3 +98,19 @@ async def test_agent_out_baseio():
             output_schema=TestIO,
         )
         resp = await agent.run("test")
+
+
+@pytest.mark.asyncio
+async def test_agent_out_none():
+    agent = Agent(
+        model=TestModel(),
+        input_schema=str,
+        output_schema=str,
+    )
+    mock_result = Mock(spec=RunResult)
+    mock_result.data = None
+    # Test that the agent raises the correct error when the model returns None data (perhaps unable to parse a response)
+
+    agent.pai_agent.run = AsyncMock(return_value=mock_result)
+    with pytest.raises(AgentyValueError):
+        await agent.run("test")

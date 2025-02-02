@@ -20,6 +20,7 @@ from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
 from agenty.template import apply_template
 from agenty.types import AgentInputT, AgentOutputT, AgentIO
+from agenty.exceptions import AgentyValueError
 
 __all__ = ["Agent"]
 
@@ -56,14 +57,18 @@ class AgentMeta(type):
             pai_agent = pai.Agent(
                 namespace.get("model"),
                 deps_type=cls,
-                result_type=namespace.get("output_schema", str),
-                system_prompt=namespace.get("system_prompt", ""),
-                model_settings=namespace.get("model_settings"),
-                retries=namespace.get("retries", 1),
-                result_retries=namespace.get("result_retries"),
-                end_strategy=namespace.get("end_strategy", "early"),
+                result_type=getattr(cls, "output_schema", str),
+                system_prompt=getattr(cls, "system_prompt", ""),
+                model_settings=getattr(cls, "model_settings", None),
+                retries=getattr(cls, "retries", 1),
+                result_retries=getattr(cls, "result_retries", None),
+                end_strategy=getattr(cls, "end_strategy", "early"),
             )
+            # Set the pai agent as a private class attribute
             setattr(cls, "_pai_agent", pai_agent)
+
+            # Add tools to the pai agent
+            # TODO: Add support for tool decorator with parameters
             tool_decorator = pai_agent.tool(
                 retries=None,
                 docstring_format="auto",
@@ -102,12 +107,12 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
     model: Union[KnownModelName, Model] = "gpt-4o"
     system_prompt: str = ""
-    model_settings: Optional[ModelSettings]
-    input_schema: Type[AgentIO]
-    output_schema: Type[AgentIO]
-    retries: int
-    result_retries: Optional[int]
-    end_strategy: EndStrategy
+    model_settings: Optional[ModelSettings] = None
+    input_schema: Type[AgentIO] = str
+    output_schema: Type[AgentIO] = str
+    retries: int = 1
+    result_retries: Optional[int] = None
+    end_strategy: EndStrategy = "early"
 
     _pai_agent: pai.Agent["Agent[Any, Any]", AgentIO]
 
@@ -186,6 +191,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
         ).to_pydantic_ai(ctx=self.template_context())
+
         result = await self.pai_agent.run(
             str(input_data),
             message_history=[system_prompt]
@@ -193,7 +199,10 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             deps=self,
             usage_limits=self.usage_limits[self.model_name],
             usage=self.usage[self.model_name],
+            # result_type=self.output_schema,  # doing this allows the result schema to be None which supports raw text responses
         )
+        if result.data is None:
+            raise AgentyValueError("No data returned from agent")
 
         self.memory.add("assistant", result.data)
         return cast(AgentOutputT, result.data)
@@ -217,6 +226,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             usage=self.usage[self.model_name],
         ) as result:
             async for message in result.stream():
+                # this is definitely broken because it never adds to agent's memory but I'm not sure when to add it
                 yield cast(AgentOutputT, message)
 
     def render_system_prompt(self) -> str:
@@ -246,7 +256,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             ValueError: If no model is set
         """
         if self.pai_agent.model is None:
-            raise ValueError("Model is not set")
+            raise AgentyValueError("Model is not set")
 
         if isinstance(self.pai_agent.model, str):
             model_name = self.pai_agent.model
