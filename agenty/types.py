@@ -8,7 +8,6 @@ __all__ = [
     "BaseIO",
     "AgentIO",
     "AgentIOBase",
-    "AgentIOType",
     "AgentInputT",
     "AgentOutputT",
 ]
@@ -54,24 +53,9 @@ used for agent inputs and outputs.
 """
 
 AgentIO = Union[AgentIOBase, Sequence[AgentIOBase]]
-"""Union type for all valid agent I/O types.
+"""All supported data types for agent communication.
 
-This type extends AgentIOBase to include sequences of basic types, allowing for
-both single values and collections in agent I/O.
-"""
-
-AgentIOType = Union[
-    Type[bool],
-    Type[int],
-    Type[float],
-    Type[str],
-    Type[BaseIO],
-    Type[Sequence[AgentIOBase]],
-]
-"""Union type for agent I/O type annotations.
-
-This type represents the allowed types that can be used to annotate agent
-inputs and outputs at a type level.
+Extends the core types (AgentIOBase) to also support sequences/lists of those types.
 """
 
 AgentInputT = TypeVar(
@@ -81,8 +65,7 @@ AgentInputT = TypeVar(
 )
 """Type variable for agent input types.
 
-This type variable is used for generic agent implementations to specify their
-input type, bounded by AgentIO with a default of str.
+This type variable is used for generic agent implementations to specify their input schema
 """
 
 AgentOutputT = TypeVar(
@@ -92,6 +75,13 @@ AgentOutputT = TypeVar(
 )
 """Type variable for agent output types.
 
-This type variable is used for generic agent implementations to specify their
-output type, bounded by AgentIO with a default of str.
+This type variable is used for generic agent implementations to specify their output schema
+"""
+
+AgentTeamT = TypeVar(
+    "AgentTeamT",
+    bound=AgentIO,
+    default=str,
+)
+"""This type variable is used for team-based agent communication.
 """

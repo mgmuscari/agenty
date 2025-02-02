@@ -57,6 +57,7 @@ class AgentMeta(type):
             pai_agent = pai.Agent(
                 namespace.get("model"),
                 deps_type=cls,
+                name=name,
                 result_type=getattr(cls, "output_schema", str),
                 system_prompt=getattr(cls, "system_prompt", ""),
                 model_settings=getattr(cls, "model_settings", None),
@@ -126,6 +127,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         retries: int = 1,
         result_retries: Optional[int] = None,
         end_strategy: EndStrategy = "early",
+        name: Optional[str] = None,
         memory: Optional[AgentMemory] = None,
         usage: Optional[AgentUsage] = None,
         usage_limits: Optional[AgentUsageLimits] = None,
@@ -150,6 +152,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         self.memory = memory or AgentMemory()
         self.usage = usage or AgentUsage()
         self.usage_limits = usage_limits or AgentUsageLimits()
+        self.name = name or self.__class__.__name__
 
         # If any of the following attributes are set, recreate the pydantic-ai agent for the entire class
         if any(
