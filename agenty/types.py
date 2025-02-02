@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Type, TypedDict
+from typing import Union, Sequence, TypedDict
 from typing_extensions import TypeVar
 
 from pydantic import BaseModel
