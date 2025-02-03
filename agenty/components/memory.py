@@ -120,7 +120,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
     def add(
         self,
         role: Role,
-        content: Union[AgentIO, str],
+        content: AgentIO,
         name: Optional[str] = None,
     ) -> None:
         """Add a message to history.

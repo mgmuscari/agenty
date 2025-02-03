@@ -19,8 +19,17 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
 from agenty.exceptions import AgentyValueError
+from agenty.pipeline import Pipeline
 from agenty.template import apply_template
-from agenty.types import AgentIO, AgentInputT, AgentOutputT
+from agenty.types import (
+    AgentIO,
+    AgentInputT,
+    AgentOutputT,
+    PipelineOutputT,
+    NOT_GIVEN,
+    NOT_GIVEN_,
+)
+from agenty.protocol import AgentProtocol
 
 __all__ = ["Agent"]
 
@@ -87,15 +96,6 @@ class AgentMeta(type):
         except Exception:
             pass
         return cls
-
-
-class NOT_GIVEN:
-    """Sentinel class used to distinguish between unset and None values."""
-
-    ...
-
-
-NOT_GIVEN_ = NOT_GIVEN()
 
 
 class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
@@ -303,3 +303,18 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             pai.Agent: The pydantic-ai agent instance
         """
         return self._pai_agent
+
+    def get_input_schema(self) -> AgentInputT:
+        return cast(AgentInputT, self.input_schema)
+
+    def get_output_schema(self) -> AgentOutputT:
+        return cast(AgentOutputT, self.output_schema)
+
+    def __or__(
+        self, other: AgentProtocol[AgentOutputT, PipelineOutputT]
+    ) -> AgentProtocol[AgentInputT, PipelineOutputT]:
+        return Pipeline[AgentInputT, PipelineOutputT](
+            agents=[self, other],
+            input_schema=self.input_schema,
+            output_schema=other.output_schema,
+        )

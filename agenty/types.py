@@ -44,7 +44,6 @@ AgentIOBase = Union[
     int,
     float,
     str,
-    TypedDict,
     BaseIO,
 ]
 """Union type for basic agent I/O types.
@@ -63,7 +62,6 @@ AgentInputT = TypeVar(
     "AgentInputT",
     bound=AgentIO,
     default=str,
-    # covariant=True,
 )
 """Type variable for agent input types.
 
@@ -74,7 +72,6 @@ AgentOutputT = TypeVar(
     "AgentOutputT",
     bound=AgentIO,
     default=str,
-    # covariant=True,
 )
 """Type variable for agent output types.
 
@@ -85,7 +82,6 @@ PipelineOutputT = TypeVar(
     "PipelineOutputT",
     bound=AgentIO,
     default=str,
-    # covariant=True,
 )
 
 
