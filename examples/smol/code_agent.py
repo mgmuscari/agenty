@@ -5,7 +5,7 @@ from smolagents import (
     DuckDuckGoSearchTool,
     PythonInterpreterTool,
 )
-from agenty.adapters.smol import SmolCodeAgent
+from agenty.integrations.smol import SmolCodeAgent
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-1234")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "http://127.0.0.1:4000")

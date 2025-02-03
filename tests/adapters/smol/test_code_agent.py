@@ -4,7 +4,7 @@ import pytest
 from pydantic_ai.models.test import TestModel
 from pydantic_core import ValidationError
 
-from agenty.adapters.smol.code_agent import SmolCodeAgent
+from agenty.integrations.smol.code_agent import SmolCodeAgent
 
 from smolagents.default_tools import PythonInterpreterTool
 
