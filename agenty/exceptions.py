@@ -10,5 +10,9 @@ class AgentyValueError(AgentyException, ValueError):
     pass
 
 
+class AgentyTypeError(AgentyException, TypeError):
+    pass
+
+
 class UnsupportedModel(AgentyValueError):
     pass
