@@ -1,5 +1,6 @@
-from typing import Union, List, Tuple, TypedDict
+from typing import Union, TypedDict, Sequence, Any, Optional
 from typing_extensions import TypeVar
+from typing_inspect import get_args
 
 from pydantic import BaseModel
 from rich.json import JSON
@@ -52,7 +53,7 @@ This type represents the allowed primitive types and BaseIO models that can be
 used for agent inputs and outputs.
 """
 
-AgentIO = Union[AgentIOBase, List[AgentIOBase], Tuple[AgentIOBase]]
+AgentIO = Union[AgentIOBase, Sequence[AgentIOBase]]
 """All supported data types for agent communication.
 
 Extends the core types (AgentIOBase) to also support sequences/lists of those types.
@@ -62,6 +63,7 @@ AgentInputT = TypeVar(
     "AgentInputT",
     bound=AgentIO,
     default=str,
+    # covariant=True,
 )
 """Type variable for agent input types.
 
@@ -72,16 +74,42 @@ AgentOutputT = TypeVar(
     "AgentOutputT",
     bound=AgentIO,
     default=str,
+    # covariant=True,
 )
 """Type variable for agent output types.
 
 This type variable is used for generic agent implementations to specify their output schema
 """
 
-AgentTeamT = TypeVar(
-    "AgentTeamT",
+PipelineOutputT = TypeVar(
+    "PipelineOutputT",
     bound=AgentIO,
     default=str,
+    # covariant=True,
 )
-"""This type variable is used for team-based agent communication.
-"""
+
+
+class NOT_GIVEN:
+    """Sentinel class used to distinguish between unset and None values."""
+
+    ...
+
+
+NOT_GIVEN_ = NOT_GIVEN()
+
+
+def is_sequence_type(output_type: Any) -> bool:
+    """Check if the given output type is a sequence (list or tuple)."""
+    from typing_inspect import get_origin
+
+    return output_type in (list, tuple) or get_origin(output_type) in (list, tuple)
+
+
+def get_sequence_item_type(output_type: Any) -> Optional[Any]:
+    """Get the item type of a sequence type."""
+    if not is_sequence_type(output_type):
+        return None
+    try:
+        return get_args(output_type)[0]
+    except IndexError:
+        return None

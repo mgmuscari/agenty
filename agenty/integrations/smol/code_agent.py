@@ -1,14 +1,18 @@
 import asyncio
 import json
 import os
-from typing import Dict, List, Any, cast, Optional
-
-from typing_inspect import get_args
+from typing import Dict, List, Any, cast
 from pydantic.type_adapter import TypeAdapter
 from pydantic import ValidationError
 from agenty import Agent
 from agenty.exceptions import UnsupportedModel, InvalidResponse
-from agenty.types import AgentInputT, AgentOutputT, BaseIO
+from agenty.types import (
+    AgentInputT,
+    AgentOutputT,
+    BaseIO,
+    is_sequence_type,
+    get_sequence_item_type,
+)
 
 try:
     from smolagents.agents import (
@@ -29,23 +33,6 @@ except ImportError as _import_error:
     ) from _import_error
 
 
-def _is_sequence_type(output_type: Any) -> bool:
-    """Check if the given output type is a sequence (list or tuple)."""
-    from typing_inspect import get_origin
-
-    return output_type in (list, tuple) or get_origin(output_type) in (list, tuple)
-
-
-def _get_sequence_item_type(output_type: Any) -> Optional[Any]:
-    """Get the item type of a sequence type."""
-    if not _is_sequence_type(output_type):
-        return None
-    try:
-        return get_args(output_type)[0]
-    except IndexError:
-        return None
-
-
 def gen_schema_instructions(output_type: Any) -> str:
     """Generate schema instructions for the given output type.
 
@@ -63,8 +50,8 @@ def gen_schema_instructions(output_type: Any) -> str:
         return ""
 
     # Handle sequence types
-    if _is_sequence_type(output_type):
-        item_type = _get_sequence_item_type(output_type)
+    if is_sequence_type(output_type):
+        item_type = get_sequence_item_type(output_type)
 
         # Handle different sequence item types
         if item_type is str or item_type is None:
