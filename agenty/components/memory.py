@@ -186,6 +186,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
         Returns:
             list[ModelMessage]: Messages formatted for Pydantic-AI
         """
+        # TODO: Do we really need to template the entire message history? Maybe just the last message?
         return [msg.to_pydantic_ai(ctx) for msg in self._messages]
 
     @overload
