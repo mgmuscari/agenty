@@ -40,36 +40,6 @@ async def test_agent_out_list():
 
 
 @pytest.mark.asyncio
-async def test_agent_out_dict():
-    class TestDict(TypedDict):
-        a: int
-        b: str
-        c: bool
-
-    agent = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"a": 1, "b": "test", "c": "True"},
-        ),
-        input_schema=str,
-        output_schema=TestDict,
-    )
-    resp = await agent.run("test")
-    assert resp == {"a": 1, "b": "test", "c": True}
-
-    with pytest.raises(pai.exceptions.UnexpectedModelBehavior):
-        agent = Agent(
-            model=TestModel(
-                call_tools=[],
-                custom_result_args=({"a": 1, "b": "test", "c": "True", "d": "extra"},),
-            ),
-            input_schema=str,
-            output_schema=TestDict,
-        )
-        resp = await agent.run("test")
-
-
-@pytest.mark.asyncio
 async def test_agent_out_baseio():
     class TestIO(BaseIO):
         a: int

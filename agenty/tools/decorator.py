@@ -7,7 +7,7 @@ from pydantic_ai.tools import RunContext, ToolParams
 from agenty.agent import Agent
 from agenty.types import AgentInputT, AgentOutputT
 
-__all__ = ["tool"]
+__all__ = []
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # TODO: Do more research...
 # https://stackoverflow.com/questions/19314405/how-to-detect-if-decorator-has-been-applied-to-method-or-function
 def tool(
-    func: Callable[ToolParams, AgentOutputT]
+    func: Callable[ToolParams, AgentOutputT],
 ) -> Callable[ToolParams, AgentOutputT]:
     """Decorator to register a method as an agent tool.
 
