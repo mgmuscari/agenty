@@ -1,4 +1,4 @@
-from typing import Union, Sequence, TypedDict
+from typing import Union, List, Tuple, TypedDict
 from typing_extensions import TypeVar
 
 from pydantic import BaseModel
@@ -52,7 +52,7 @@ This type represents the allowed primitive types and BaseIO models that can be
 used for agent inputs and outputs.
 """
 
-AgentIO = Union[AgentIOBase, Sequence[AgentIOBase]]
+AgentIO = Union[AgentIOBase, List[AgentIOBase], Tuple[AgentIOBase]]
 """All supported data types for agent communication.
 
 Extends the core types (AgentIOBase) to also support sequences/lists of those types.
