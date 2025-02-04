@@ -1,7 +1,6 @@
 """Tests for usage tracking components."""
 
 import pytest
-from typing import Iterator
 
 from agenty.components.usage import AgentUsage, AgentUsageLimits
 from pydantic_ai.usage import Usage, UsageLimits

@@ -1,4 +1,4 @@
-from typing import List, Type
+from typing import List
 import pytest
 from unittest.mock import AsyncMock
 
@@ -6,7 +6,7 @@ from pydantic_ai.models.test import TestModel
 
 from agenty import Agent
 from agenty.exceptions import AgentyTypeError
-from agenty.types import BaseIO, AgentIO
+from agenty.types import BaseIO
 from agenty.pipeline import Pipeline
 
 
@@ -70,7 +70,7 @@ class TestPipeline:
         result = await pipeline.run("test input")
         assert result == user_names
         assert isinstance(pipeline, Pipeline)
-        assert pipeline.input_schema == str
+        assert pipeline.input_schema is str
         assert pipeline.output_schema == List[str]
 
     async def test_pipeline_type_validation_error(

@@ -1,5 +1,4 @@
 import pytest
-from typing import Dict
 
 from pydantic_ai.messages import (
     ModelRequest,
