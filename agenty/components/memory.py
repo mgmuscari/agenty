@@ -13,7 +13,8 @@ from pydantic_ai.messages import (
     TextPart,
 )
 from agenty.template import apply_template
-from agenty.types import AgentIO
+from agenty.types import AgentIO, is_sequence_type
+import agenty.exceptions as exc
 
 __all__ = ["ChatMessage", "AgentMemory", "Role"]
 
@@ -223,12 +224,17 @@ class AgentMemory(MutableSequence[ChatMessage]):
             TypeError: If value type doesn't match index type
         """
         if isinstance(index, slice):
-            if not isinstance(value, Sequence):
-                raise TypeError("Can only assign sequence to slice")
+            if not is_sequence_type(type(value)):
+                raise exc.AgentyTypeError("Can only assign sequence to slice")
+            for val in value:
+                if not isinstance(val, ChatMessage):
+                    raise exc.AgentyTypeError("Can only assign ChatMessage")
+            if isinstance(value, ChatMessage):
+                raise exc.AgentyTypeError("Can only assign sequence to slice")
             self._messages[index] = value
         else:
             if not isinstance(value, ChatMessage):
-                raise TypeError("Can only assign ChatMessage")
+                raise exc.AgentyTypeError("Can only assign ChatMessage")
             self._messages[index] = value
 
     def __delitem__(self, index: Union[int, slice]) -> None:

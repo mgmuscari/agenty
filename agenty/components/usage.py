@@ -70,6 +70,9 @@ class AgentUsage(MutableMapping[str, Usage]):
         """
         return len(self._usages)
 
+    def __contains__(self, key) -> bool:
+        return key in self._usages
+
     @property
     def requests(self) -> int:
         """Get the total number of requests across all models.
@@ -169,3 +172,6 @@ class AgentUsageLimits(MutableMapping[str, UsageLimits]):
             int: Number of models with UsageLimits
         """
         return len(self._usage_limits)
+
+    def __contains__(self, key) -> bool:
+        return key in self._usage_limits
