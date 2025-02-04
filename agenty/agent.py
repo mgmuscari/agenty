@@ -57,10 +57,18 @@ class AgentMeta(type):
         namespace: dict[str, Any],
     ) -> Any:
         tools: List[Callable] = []
-        for key, value in namespace.items():
+        input_hooks: List[Callable] = []
+        output_hooks: List[Callable] = []
+        for _, value in namespace.items():
             if hasattr(value, "_is_tool"):
                 tools.append(value)
+            if hasattr(value, "_is_hook_input"):
+                input_hooks.insert(0, value)
+            if hasattr(value, "_is_hook_output"):
+                output_hooks.insert(0, value)
         cls = super().__new__(mcls, name, bases, namespace)
+        setattr(cls, "_input_hooks", input_hooks)
+        setattr(cls, "_output_hooks", output_hooks)
         try:
             pai_agent = pai.Agent(
                 namespace.get("model"),
@@ -124,6 +132,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     end_strategy: EndStrategy = "early"
 
     _pai_agent: pai.Agent["Agent[Any, Any]", AgentIO]
+    _input_hooks: List[Callable]
+    _output_hooks: List[Callable]
 
     def __init__(
         self,
@@ -211,6 +221,14 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         Returns:
             The processed output data
         """
+        for input_hook in self._input_hooks:
+            _type = type(input_data)
+            input_data = input_hook(self, input_data)
+            if not isinstance(input_data, _type):
+                raise AgentyValueError(
+                    f"Input hook {input_hook.__name__} returned invalid type"
+                )
+
         self.memory.add("user", input_data)
 
         system_prompt = ChatMessage(
@@ -229,6 +247,13 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         if output.data is None:
             raise AgentyValueError("No data returned from agent")
 
+        for output_hook in self._output_hooks:
+            _type = type(output.data)
+            output.data = output_hook(self, output.data)
+            if not isinstance(output.data, _type):
+                raise AgentyValueError(
+                    f"Output hook {output_hook.__name__} returned invalid type"
+                )
         self.memory.add("assistant", output.data)
         return cast(AgentOutputT, output.data)
 
