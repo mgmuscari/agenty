@@ -1,4 +1,4 @@
-from typing import Any, Generic, List, Type
+from typing import Any, Generic, List, Type, Optional
 
 from agenty.types import (
     AgentIO,
@@ -12,6 +12,34 @@ from agenty.types import (
 )
 from agenty.exceptions import AgentyTypeError
 from agenty.protocol import AgentProtocol
+
+
+def _validate_schema(data: Any, schema: Type[AgentIO], context: str) -> None:
+    """Validate that data matches the expected schema type.
+
+    Args:
+        data: The data to validate
+        schema: The expected schema type
+        context: Context string for error message (e.g. 'input' or 'output')
+
+    Raises:
+        AgentyTypeError: If data type doesn't match the schema
+    """
+    check_type: Any = type(data)
+    check_schema: Any = schema
+
+    if is_sequence_type(check_type) and is_sequence_type(schema):
+        check_schema = get_sequence_item_type(schema)
+        try:
+            check_type = type(data[0])
+        except IndexError:
+            # list is empty so technically type is correct
+            check_type = check_schema
+
+    if check_type is not check_schema:
+        raise AgentyTypeError(
+            f"{context.capitalize()} data type {type(data)} does not match schema {schema}"
+        )
 
 
 class Pipeline(Generic[AgentInputT, AgentOutputT]):
@@ -53,6 +81,8 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         if not isinstance(output_schema, NOT_GIVEN):
             self.output_schema = output_schema
         self.agents = agents
+        self.output_history = []
+        self.current_step: Optional[int] = None
 
     async def run(
         self,
@@ -74,41 +104,24 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         """
         current_input: Any = input_data
         res: Any = None
+        self.current_step = 0
+
         for agent in self.agents:
-            check_input_type: Any = type(current_input)
-            check_schema: Any = agent.input_schema
-
-            if is_sequence_type(check_input_type) and is_sequence_type(
-                agent.input_schema
-            ):
-                check_schema = get_sequence_item_type(agent.input_schema)
-                try:
-                    check_input_type = type(current_input[0])
-                except IndexError:
-                    # list is empty so technically type is correct
-                    check_input_type = check_schema
-            if check_input_type is not check_schema:
-                # TODO: better error message that shows the full type rather than just <class 'list'>
-                raise AgentyTypeError(
-                    f"Input data type {type(current_input)} does not match agent input schema {agent.input_schema}"
-                )
-            res = await agent.run(input_data)
-            # do stuff with res(?)
-            current_input = res
-
-        check_output_type: Any = type(res)
-        check_schema: Any = self.output_schema
-        if is_sequence_type(check_output_type) and is_sequence_type(self.output_schema):
-            check_schema = get_sequence_item_type(self.output_schema)
-            try:
-                check_output_type = type(res[0])
-            except IndexError:
-                # list is empty so technically type is correct
-                check_output_type = check_schema
-        if check_output_type is not check_schema:
-            raise AgentyTypeError(
-                f"Output data type {type(res)} does not match pipeline's output schema {self.output_schema}"
+            _validate_schema(
+                data=current_input,
+                schema=agent.input_schema,
+                context="input",
             )
+            res = await agent.run(current_input)
+            current_input = res
+            self.output_history.append(res)
+            self.current_step += 1
+
+        _validate_schema(
+            data=res,
+            schema=self.output_schema,
+            context="output",
+        )
         return res
 
     def __or__(
