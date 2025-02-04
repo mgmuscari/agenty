@@ -16,10 +16,12 @@ nav:
   - Templates: documentation/templates.md
 - User Guide:
   - Agent Configuration: documentation/agent_configuration.md
+  - Hooks: documentation/hooks.md
 - Integrations:
   - smolagents: integrations/smol.md
 - API Reference:
   - Core: agenty.md
+  - Decorators: decorators.md
   - Components:
     - Memory: components/memory.md
     - Usage: components/usage.md

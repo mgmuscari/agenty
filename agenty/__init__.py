@@ -1,13 +1,15 @@
 from .agent import Agent
 from .pipeline import Pipeline
 from .protocol import AgentProtocol
-from .tools import tool
+from .decorators import tool, hook
 from . import types
 from . import components
 
 __all__ = [
     "Agent",
+    "decorators",
     "tool",
+    "hook",
     "types",
     "components",
     "Pipeline",
