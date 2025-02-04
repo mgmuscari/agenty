@@ -9,14 +9,13 @@ nav:
 - Getting Started:
   - Installation: quickstart/install.md
   - Getting Started: quickstart/getting_started.md
-- Highlights:
-  - Tools: documentation/tools.md
-  - Structured I/O: documentation/structured_io.md
-  - Pipelines: documentation/pipelines.md
-  - Templates: documentation/templates.md
 - User Guide:
-  - Agent Configuration: documentation/agent_configuration.md
+  - Configuration: documentation/agent_configuration.md
   - Hooks: documentation/hooks.md
+  - Pipelines: documentation/pipelines.md
+  - Structured I/O: documentation/structured_io.md
+  - Templates: documentation/templates.md
+  - Tools: documentation/tools.md
 - Integrations:
   - smolagents: integrations/smol.md
 - API Reference:

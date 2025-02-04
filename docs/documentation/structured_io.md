@@ -1,18 +1,32 @@
-Agenty supports structured input and output types of type `AgentIO`.
+# Structured I/O
+
+Agenty provides powerful type-safe input and output handling through structured I/O types. This system enables you to work with complex data structures while maintaining type safety and validation.
+
+## Overview
+
+The structured I/O system is built on two key concepts:
+
+- `AgentIO`: A union type that supports primitive types and structured objects
+- `BaseIO`: A base class for creating structured data models (built on Pydantic)
+
+Supported types include:
 ```python
-AgentIO = Union[bool, int, float, str, BaseIO, Sequence[AgentIO]]
+AgentIO = Union[
+    bool,          # Boolean values
+    int,           # Integer numbers
+    float,         # Floating point numbers
+    str,           # Text strings
+    BaseIO,        # Structured data models
+    Sequence[...], # Lists/sequences of any above type
+]
 ```
 
-Data validation for structured objects can be done by inheriting from `agenty.types.BaseIO` (which are just Pydantic Models).
+## Basic Usage
 
-
-
-Here's an example that extracts user information from text:
+Here's a simple example of using structured I/O with a user information extractor:
 
 ```python
-import asyncio
 from typing import List
-from pydantic_ai.models.openai import OpenAIModel
 from agenty import Agent
 from agenty.types import BaseIO
 
@@ -21,52 +35,199 @@ class User(BaseIO):
     age: int
     hobbies: List[str]
 
-class UserExtractor(Agent[str, List[User]]): # Generics are used for static type-checking
-    input_schema = str  # Controls input type
-    output_schema = List[User]  # Controls output type
-    model = OpenAIModel("gpt-4o", api_key="your-api-key")
-    system_prompt = "Extract all user information"
-
-async def main():
-    agent = UserExtractor()
-    story = ('At the community center, Emma, 32, was painting a vibrant sunset '
-            'while Jake, 27, captured it through his camera lens. '
-            'Nearby, Sophia, 35, a runner and yoga enthusiast, '
-            'was practicing stretches after her morning jog. '
-            'Ben, 30, a fitness coach, was doing push-ups in the corner, '
-            'taking a break from his workout. '
-            'Each of them enjoyed their unique hobbies, '
-            'creating a lively atmosphere filled with creativity, '
-            'fitness, and relaxation. They shared stories about their passions, '
-            'encouraging one another to pursue what they loved.')
-    
-    # Static type-checkers correctly detect that input must be str and output must be List[User]
-    users = await agent.run(story)
-    
-    for user in users:
-        print(f"Name: {user.name}")
-        print(f"Age: {user.age}")
-        print(f"Hobbies: {', '.join(user.hobbies)}")
-        print()
-
-asyncio.run(main())
-
-# Output:
-# Name: Emma
-# Age: 32
-# Hobbies: painting
-
-# Name: Jake
-# Age: 27
-# Hobbies: photography
-
-# Name: Sophia
-# Age: 35
-# Hobbies: running, yoga
-
-# Name: Ben
-# Age: 30
-# Hobbies: fitness coaching, working out
+class UserExtractor(Agent[str, List[User]]):
+    input_schema = str
+    output_schema = List[User]
+    system_prompt = "Extract user information from the text"
 ```
 
----
+## Working with Sequences
+
+Extracting a list of data is an extremely common task. You can work with sequences (lists) of any supported type:
+
+```python
+from typing import List, Dict
+from agenty.types import BaseIO
+
+class NewsArticle(BaseIO):
+    title: str
+    content: str
+    tags: List[str]
+
+class NewsAggregator(Agent[str, List[NewsArticle]]):
+    input_schema = str
+    output_schema = List[NewsArticle]
+    system_prompt = "Extract news articles from the text"
+
+async def main():
+    agent = NewsAggregator()
+    text = """
+    Breaking: New AI Breakthrough
+    Scientists announce major progress in machine learning...
+    #tech #ai #research
+    
+    Weather Update: Storm Warning
+    Coastal areas prepare for incoming storm system...
+    #weather #safety
+    """
+    articles = await agent.run(text)
+    
+    for article in articles:
+        print(f"Title: {article.title}")
+        print(f"Tags: {', '.join(article.tags)}")
+        print()
+```
+
+## Complex Data
+
+You can create nested structures for more complex data:
+
+```python
+from typing import List, Optional
+from agenty.types import BaseIO
+from agenty.agent import Agent
+
+class Address(BaseIO):
+    street: str
+    city: str
+    country: str
+    postal_code: str
+
+class Contact(BaseIO):
+    email: str
+    phone: Optional[str] = None
+
+class Person(BaseIO):
+    name: str
+    age: int
+    address: Address
+    contact: Contact
+    interests: List[str]
+
+class ProfileAnalyzer(Agent[str, Person]):
+    input_schema = str
+    output_schema = Person
+    system_prompt = "Extract detailed profile information"
+
+# Example usage:
+"""
+profile = await ProfileAnalyzer().run(
+    '''John Smith, 34, lives at 123 Main St, Boston, USA 02108.
+    He can be reached at john@email.com or (555) 123-4567.
+    John enjoys hiking, photography, and cooking.'''
+)
+
+# Access nested data with type safety
+print(f"Name: {profile.name}")         # John Smith
+print(f"City: {profile.address.city}") # Boston
+print(f"Email: {profile.contact.email}") # john@email.com
+"""
+```
+
+## Type Safety and Validation
+
+The structured I/O system provides 2 layers of type safety:
+
+1. **Static Type Checking**: Generics ensure your type checker works as expected:
+```python
+class DataProcessor(Agent[List[int], float]):
+    input_schema = List[int]   # Must match first type parameter
+    output_schema = float      # Must match second type parameter
+```
+
+2. **Runtime Validation**: Pydantic-based validation ensures data correctness:
+```python
+class Temperature(BaseIO):
+    celsius: float
+    
+    @property
+    def fahrenheit(self) -> float:
+        return (self.celsius * 9/5) + 32
+    
+    @property
+    def kelvin(self) -> float:
+        return self.celsius + 273.15
+
+class WeatherStation(Agent[str, Temperature]):
+    input_schema = str
+    output_schema = Temperature
+    
+    # Invalid data will raise validation errors
+    # e.g., if the model returns non-numeric temperature
+```
+
+## Best Practices
+1. **Type Safety**
+    - Always specify input_schema and output_schema
+    - Use type hints consistently
+    - Let static type checkers help catch errors early
+    - Handle validation errors gracefully
+
+2. **Pydantic Model Design**
+    - Keep models focused and single-purpose
+    - Use descriptive field names
+    - Include type hints for all fields
+    - Use Optional[] for fields that might be missing
+    - Consider adding validation methods or properties
+
+3. **Data Validation**
+    - Add field validators when needed
+    - Use Pydantic's built-in validation features
+    - Consider adding custom validation methods
+    - Document any validation requirements
+
+4. **Error Handling**
+    - Plan for validation errors
+    - Provide meaningful error messages
+    - Consider adding custom error types
+    - Document expected error cases
+
+## Advanced Features
+
+### Custom Validation
+
+You can add custom validation to your models:
+
+```python
+from pydantic import validator
+from agenty.types import BaseIO
+
+class User(BaseIO):
+    name: str
+    age: int
+    email: str
+
+    @validator('age')
+    def validate_age(cls, v):
+        if v < 0 or v > 150:
+            raise ValueError('Age must be between 0 and 150')
+        return v
+
+    @validator('email')
+    def validate_email(cls, v):
+        if '@' not in v:
+            raise ValueError('Invalid email format')
+        return v.lower()
+```
+
+### Rich Console Output
+
+BaseIO models automatically support rich console output:
+
+```python
+from agenty.types import BaseIO
+from rich.console import Console
+class User(BaseIO):
+    name: str
+    age: int
+    email: str
+console = Console()
+user = User(name="Alice", age=30, email="alice@example.com")
+console.print(user)
+# pretty colored output
+# {
+#   "name": "Alice",
+#   "age": 30,
+#   "email": "alice@example.com"
+# }
+```

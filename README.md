@@ -13,12 +13,9 @@ Agenty provides a clean, type-safe interface for creating:
 - Complex agent interactions with minimal boilerplate
 
 ## Key Features
-- Intuitive Pythonic interfaces that feel natural to use
-- Structured Agent I/O for predictable behavior
-- Agent Pipelines to enable sequential workflows
-- Jinja2 templates for prompts and messages for dynamic context
 - Built on pydantic-ai for type validation
 - Automatic conversation history management
+- Intuitive Pythonic interfaces
 
 The framework is currently only officially tested with the OpenAI API (through a proxy such as [LiteLLM](https://docs.litellm.ai/docs/simple_proxy)/[OpenRouter](https://openrouter.ai/docs/quick-start)) although theoretically it supports all the models supported by pydantic-ai.
 
@@ -77,57 +74,94 @@ async def main():
 asyncio.run(main())
 ```
 ---
-## Simple Tools
 
-Functions can be used as tools through a simple decorator pattern.
-
-1. **Define Your Agent:** Create a custom class that inherits from the base Agent class.
-
-2. **Implement Tool Methods**: Add methods to your agent class that will serve as tools. Each method should include a docstring that describes the tool. You can even add parameter descriptions in the docstring and pydantic-ai implements [griffe](https://mkdocstrings.github.io/griffe/) to automatically generate tool parameter descriptions.
-
-3. **Register Tools:** Use the `@tool` decorator to mark methods as tools. The decorator automatically registers these methods, making them available for your agent to use during execution. No additional configuration is needed.
-
-Here's an example of a roulette game agent:
+### Tools
+Add capabilities to your agents with simple decorators:
 ```python
-import asyncio
-import random
+class WeatherAgent(Agent):
+    system_prompt = "You help users check the weather."
 
-from agenty import Agent, tool
-from pydantic_ai.models.openai import OpenAIModel
-
-
-class RouletteAgent(Agent):
-    model = OpenAIModel("gpt-4o", api_key="your-api-key")
-    system_prompt = "You're a dice game, you should roll the die and see if the number matches the user's guess."
-
-    def __init__(self, player_name: str, num_sides: int = 10, **kwargs):
-        super().__init__(**kwargs)
-        self.player_name = player_name
-        self.num_sides = num_sides
+    def __init__(self, location: str):
+        super().__init__()
+        self.location = location
+        self.temperature = 72  # Simulated temperature
 
     @tool
-    def get_player_name(self) -> str:
-        """Get the player's name."""
-        return self.player_name
+    def get_temperature(self) -> float:
+        """Get the current temperature."""
+        return self.temperature
 
     @tool
-    def roll_die(self) -> int:
-        """Roll a n-sided die and return the result."""
-        num = random.randint(1, self.num_sides)
-        print(f"Rolled a {num}!")
-        return num
+    def get_location(self) -> str:
+        """Get the configured location."""
+        return self.location
+```
+---
+### Structured I/O
+Define type-safe inputs and outputs for predictable behavior:
+```python
+from agenty import Agent
+from agenty.types import BaseIO
 
+class User(BaseIO):
+    name: str
+    age: int
+    hobbies: List[str]
 
-async def main():
-    agent = RouletteAgent(player_name="John", num_sides=6)
-    response = await agent.run("I guess the number will be 3!")
-    print(response)
-
-
-asyncio.run(main())
+class UserExtractor(Agent[str, User]):
+    input_schema = str
+    output_schema = User
+    system_prompt = "Extract user information from the text"
 ```
 
-You can read more about [function tools](https://ai.pydantic.dev/tools/) by pydantic-ai. (underlying implementation of agenty tools)
+---
+
+### Agent Pipelines
+Chain multiple agents together for complex workflows:
+```python
+class TextCleaner(Agent[str, str]):
+    model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
+    system_prompt = "Clean and format the input text"
+
+class SentimentAnalyzer(Agent[str, str]):
+    model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
+    system_prompt = "Analyze the sentiment of the text"
+
+# Create and use the pipeline
+pipeline = TextCleaner() | SentimentAnalyzer()
+result = await pipeline.run("This is my input text!")
+```
+
+---
+
+
+### Templates
+Create dynamic prompts with Jinja templates:
+```python
+class DynamicGreeter(Agent):
+    system_prompt = """
+    You are a greeter who:
+    - Speaks in a {{TONE}} tone
+    - Gives {{LENGTH}} responses
+    """
+    TONE: str = "friendly"
+    LENGTH: str = "concise"
+```
+
+---
+
+### Hooks
+Transform inputs and outputs with hooks:
+```python
+class MyAgent(Agent[str, str]):
+    @hook.input
+    def add_prefix(self, input: str) -> str:
+        return f"prefix_{input}"
+        
+    @hook.output 
+    def add_suffix(self, output: str) -> str:
+        return f"{output}_suffix"
+```
 
 ### 📚 Like what you see? **[Read the Documentation](https://agenty.readthedocs.io/)** to learn more!
 ---

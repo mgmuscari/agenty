@@ -67,5 +67,3 @@ The `SmolCodeAgent` can be configured with various tools from the smolagents lib
 - `PythonInterpreterTool`: Enables Python code execution
 - `DuckDuckGoSearchTool`: Enables web searches via DuckDuckGo
 - Additional tools can be added from the smolagents library
-
-## API Reference

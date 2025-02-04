@@ -31,6 +31,14 @@ class MyAgent(Agent[str, str]):
         return f"{output}_suffix"
 ```
 
+This flexible syntax allows you to easily process structured data in Python as well
+```python
+class AgentWithHooks(Agent[List[str], str]):
+    @hook.input
+    def invalid_hook(self, List[str]) -> int:  # This will raise an error
+        return 42
+```
+
 When this agent runs:
 
 1. The input hook will transform `hello` into `prefix_hello` before processing
@@ -93,6 +101,18 @@ class AgentWithHooks(Agent[str, str]):
     @hook.input
     def invalid_hook(self, input: str) -> int:  # This will raise an error
         return 42
+```
+
+This typing allows you to easily process structured data in Python!
+```python
+class AgentWithHooks(Agent[List[str], str]):
+    @hook.input
+    def list_hook(self, input: List[str]) -> List[str]:
+        new_list = []
+        for item in input:
+            # do stuff here
+            new_list.append(f"hook_{item}")
+        return new_list
 ```
 
 ## Wizard Agent Example
