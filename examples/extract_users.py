@@ -38,7 +38,16 @@ class UserExtractor(Agent[str, List[User]]):
 async def main() -> None:
     console = Console()
     agent = UserExtractor()
-    story = """At the community center, Emma, 32, was painting a vibrant sunset while Jake, 27, captured it through his camera lens. Nearby, Sophia, 35, a runner and yoga enthusiast, was practicing stretches after her morning jog. Ben, 30, a fitness coach, was doing push-ups in the corner, taking a break from his workout. Each of them enjoyed their unique hobbies, creating a lively atmosphere filled with creativity, fitness, and relaxation. They shared stories about their passions, encouraging one another to pursue what they loved."""
+    story = (
+        """At the community center, Emma, 32, was painting a vibrant sunset while """
+        """Jake, 27, captured it through his camera lens. Nearby, Sophia, 35, """
+        """a runner and yoga enthusiast, was practicing stretches after her """
+        """morning jog. Ben, 30, a fitness coach, was doing push-ups in the """
+        """corner, taking a break from his workout. Each of them enjoyed their """
+        """unique hobbies, creating a lively atmosphere filled with creativity, """
+        """fitness, and relaxation. They shared stories about their passions, """
+        """encouraging one another to pursue what they loved."""
+    )
     console.print(story, style="green")
     console.print("")
     console.print("---------------------------------")

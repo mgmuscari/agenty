@@ -35,13 +35,27 @@ async def main():
     # Sample Output:
     # # Friendly and medium
     # Hello there! 👋 It's wonderful to meet you! How's your day going so far? 😊
-    # Los Angeles, often known as the City of Angels, is a vibrant and diverse city located in Southern California. It's renowned for its thriving entertainment industry, being home to Hollywood, where movie and television magic happens. L.A. is famous for its beautiful beaches, such as Santa Monica and Venice Beach, offering stunning sunset views and vibrant boardwalks.
+    # Los Angeles, often known as the City of Angels, is a vibrant and diverse city "
+    # located in Southern California. It's renowned for its thriving entertainment "
+    # industry, being home to Hollywood, where movie and television magic happens. "
+    # L.A. is famous for its beautiful beaches, such as Santa Monica and Venice "
+    # Beach, offering stunning sunset views and vibrant boardwalks.
 
-    # Beyond the glitz and glamour, Los Angeles is a cultural melting pot with a rich tapestry of neighborhoods, each offering its unique flavor—from the historic streets of Olvera Street to the trendy shops of Silver Lake. The city also boasts a wide array of museums, art galleries, and theaters, making it a cultural hotspot.
+    # Beyond the glitz and glamour, Los Angeles is a cultural melting pot with a "
+    # rich tapestry of neighborhoods, each offering its unique flavor—from the "
+    # historic streets of Olvera Street to the trendy shops of Silver Lake. The "
+    # city also boasts a wide array of museums, art galleries, and theaters, "
+    # making it a cultural hotspot.
 
-    # Nature enthusiasts will enjoy the scenic hikes in the nearby Santa Monica Mountains or Griffith Park, which also hosts the iconic Griffith Observatory. And let's not forget the diverse culinary scene, featuring everything from gourmet restaurants to delicious food trucks offering cuisines from around the world.
+    # Nature enthusiasts will enjoy the scenic hikes in the nearby Santa Monica "
+    # Mountains or Griffith Park, which also hosts the iconic Griffith "
+    # Observatory. And let's not forget the diverse culinary scene, featuring "
+    # everything from gourmet restaurants to delicious food trucks offering "
+    # cuisines from around the world.
 
-    # Whether you're exploring the Walk of Fame, catching a concert at the Hollywood Bowl, or simply enjoying the sunny weather, Los Angeles is a place full of exciting opportunities and endless things to discover! 🌟🏖️🌆
+    # Whether you're exploring the Walk of Fame, catching a concert at the "
+    # Hollywood Bowl, or simply enjoying the sunny weather, Los Angeles is a "
+    # place full of exciting opportunities and endless things to discover! 🌟🏖️🌆
 
     # # Angry and short
     # It's big. It's busy. It's full of traffic! That's L.A.

@@ -29,8 +29,8 @@ class RouletteAgent(Agent):
     )
     system_prompt = (
         "You're a dice game, you should roll the die and see if the number "
-        "you get back matches the user's guess. If so, tell them they're a winner. "
-        "Use the player's name in the response."
+        "you get back matches the user's guess. If so, tell them they're "
+        "a winner. Use the player's name in the response."
     )
 
     def __init__(
