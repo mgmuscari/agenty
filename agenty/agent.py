@@ -218,7 +218,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             role="system", content=self.system_prompt
         ).to_pydantic_ai(ctx=self.template_context())
 
-        result = await self.pai_agent.run(
+        output = await self.pai_agent.run(
             str(input_data),
             message_history=[system_prompt]
             + self.memory.to_pydantic_ai(ctx=self.template_context()),
@@ -227,33 +227,33 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             usage=self.usage[self.model_name],
             # Note: Omitting result_type allows None schema which enables raw text responses
         )
-        if result.data is None:
+        if output.data is None:
             raise AgentyValueError("No data returned from agent")
 
-        self.memory.add("assistant", result.data)
-        return cast(AgentOutputT, result.data)
+        self.memory.add("assistant", output.data)
+        return cast(AgentOutputT, output.data)
 
-    async def run_stream(
-        self,
-        input_data: AgentInputT,
-    ) -> AsyncIterator[AgentOutputT]:
-        self.memory.add("user", input_data)
+    # async def run_stream(
+    #     self,
+    #     input_data: AgentInputT,
+    # ) -> AsyncIterator[AgentOutputT]:
+    #     self.memory.add("user", input_data)
 
-        system_prompt = ChatMessage(
-            role="system", content=self.system_prompt
-        ).to_pydantic_ai(ctx=self.template_context())
+    #     system_prompt = ChatMessage(
+    #         role="system", content=self.system_prompt
+    #     ).to_pydantic_ai(ctx=self.template_context())
 
-        async with self.pai_agent.run_stream(
-            str(input_data),
-            message_history=[system_prompt]
-            + self.memory.to_pydantic_ai(ctx=self.template_context()),
-            deps=self,
-            usage_limits=self.usage_limits[self.model_name],
-            usage=self.usage[self.model_name],
-        ) as result:
-            async for message in result.stream():
-                # TODO: Add to agent's memory at appropriate point in stream
-                yield cast(AgentOutputT, message)
+    #     async with self.pai_agent.run_stream(
+    #         str(input_data),
+    #         message_history=[system_prompt]
+    #         + self.memory.to_pydantic_ai(ctx=self.template_context()),
+    #         deps=self,
+    #         usage_limits=self.usage_limits[self.model_name],
+    #         usage=self.usage[self.model_name],
+    #     ) as result:
+    #         async for message in result.stream():
+    #             # TODO: Add to agent's memory at appropriate point in stream
+    #             yield cast(AgentOutputT, message)
 
     def render_system_prompt(self) -> str:
         """Render the system prompt with the current template context.

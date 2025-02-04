@@ -103,7 +103,7 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
                 or if an agent's output type doesn't match the pipeline's output schema.
         """
         current_input: Any = input_data
-        res: Any = None
+        output: Any = None
         self.current_step = 0
 
         for agent in self.agents:
@@ -112,17 +112,17 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
                 schema=agent.input_schema,
                 context="input",
             )
-            res = await agent.run(current_input)
-            current_input = res
-            self.output_history.append(res)
+            output = await agent.run(current_input)
+            current_input = output
+            self.output_history.append(output)
             self.current_step += 1
 
         _validate_schema(
-            data=res,
+            data=output,
             schema=self.output_schema,
             context="output",
         )
-        return res
+        return output
 
     def __or__(
         self, other: AgentProtocol[AgentOutputT, PipelineOutputT]
