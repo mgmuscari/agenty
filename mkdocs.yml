@@ -1,4 +1,5 @@
 site_name: "agenty"
+site_url: !ENV [ READTHEDOCS_CANONICAL_URL, "https://agenty.readthedocs.io/" ]
 repo_url: https://github.com/jonchun/agenty
 nav:
 - Introduction: index.md
@@ -21,9 +22,11 @@ nav:
     - "smol": integrations/smol.md
   - exceptions: exceptions.md
   - types: types.md
-
+extra_javascript:
+- javascript/readthedocs.js
 theme:
   name: "material"
+  custom_dir: docs/overrides
   palette:
   - media: "(prefers-color-scheme: light)"
     scheme: default

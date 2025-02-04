@@ -15,7 +15,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = ["sphinx>=8.1.3,<9", "sphinx-rtd-theme>=3.0.2,<4"]
 adapters = ["smolagents[litellm]>=1.7.0,<2"]
 smol = ["smolagents[litellm]>=1.7.0,<2"]
 
