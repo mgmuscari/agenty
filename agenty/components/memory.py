@@ -34,11 +34,11 @@ Valid values:
 class ChatMessage(BaseModel):
     """A message in the conversation history.
 
-    Args:
-        role: Message sender's role (user/assistant/tool/etc)
-        content: Message content as AgentIO
-        turn_id: UUID of the conversation turn
-        name: Optional sender name
+    Attributes:
+        role (Role): Message sender's role (user/assistant/tool/etc)
+        content (AgentIO): Message content
+        turn_id (Optional[str]): UUID of the conversation turn
+        name (Optional[str]): Optional sender name
     """
 
     role: Role
@@ -115,7 +115,11 @@ class AgentMemory(MutableSequence[ChatMessage]):
         self.current_turn_id: Optional[str] = None
 
     def initialize_turn(self) -> None:
-        """Start a new conversation turn with a fresh UUID."""
+        """Start a new conversation turn with a fresh UUID.
+
+        This method generates a new UUID for the current turn and sets it as the current_turn_id.
+        All messages added after initializing a turn will share this turn_id until end_turn() is called.
+        """
         self.current_turn_id = str(uuid.uuid4())
 
     def add(
@@ -146,6 +150,11 @@ class AgentMemory(MutableSequence[ChatMessage]):
         self.append(message)
 
     def clear(self) -> None:
+        """Clear all messages from memory and reset the current turn.
+
+        This method removes all stored messages and resets the current_turn_id to None,
+        effectively starting fresh with an empty memory state.
+        """
         self.current_turn_id = None
         return super().clear()
 
@@ -153,7 +162,8 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """Remove oldest messages if exceeding max_messages.
 
         This is called automatically when adding new messages if max_messages
-        is set to a non-negative value.
+        is set to a non-negative value. Messages are removed from the start
+        of the history (oldest first) until the length is within the max_messages limit.
         """
         if self.max_messages >= 0:
             while len(self._messages) > self.max_messages:
@@ -163,29 +173,49 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """End current conversation turn.
 
         After calling this, the next message added will start a new turn
-        with a new turn_id.
+        with a new turn_id. This helps organize messages into logical groups
+        or turns in the conversation.
+
+        Note:
+            This does not remove any messages, it only resets the current_turn_id
+            to None so that the next message will start a new turn.
         """
         self.current_turn_id = None
 
     def to_openai(self, ctx: dict[str, Any] = {}) -> list[ChatCompletionMessageParam]:
         """Get history in OpenAI API format.
 
+        Converts all messages in memory to the format expected by OpenAI's Chat API.
+        Each message is rendered with the provided template context before conversion.
+
         Args:
-            ctx: Template context dictionary for variable substitution
+            ctx: Template context dictionary for variable substitution. Used to render
+                any template variables in message content.
 
         Returns:
-            list[ChatCompletionMessageParam]: Messages formatted for OpenAI API
+            list[ChatCompletionMessageParam]: Messages formatted for OpenAI API, with each
+                message containing role, content, and optional name fields.
         """
         return [msg.to_openai(ctx) for msg in self._messages]
 
     def to_pydantic_ai(self, ctx: dict[str, Any] = {}) -> list[ModelMessage]:
         """Get history in Pydantic-AI format.
 
+        Converts all messages in memory to the format expected by Pydantic-AI.
+        Each message is rendered with the provided template context before conversion.
+
         Args:
-            ctx: Template context dictionary for variable substitution
+            ctx: Template context dictionary for variable substitution. Used to render
+                any template variables in message content.
 
         Returns:
-            list[ModelMessage]: Messages formatted for Pydantic-AI
+            list[ModelMessage]: Messages formatted for Pydantic-AI, with each message
+                converted to the appropriate ModelMessage subtype based on its role
+                (ModelRequest for user/system, ModelResponse for assistant).
+
+        Raises:
+            ValueError: If a message has an unsupported role that cannot be converted
+                to a Pydantic-AI message type.
         """
         # TODO: Do we really need to template the entire message history? Maybe just the last message?
         return [msg.to_pydantic_ai(ctx) for msg in self._messages]

@@ -135,11 +135,13 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
             "tools": self.smol_tools + smol_kwargs.get("tools", []),
         }
 
-    async def get_smol_agent(self, **kwargs) -> smolCodeAgent:
+    async def get_smol_agent(self, **kwargs: Any) -> smolCodeAgent:
         """Create a smolagents CodeAgent instance.
 
         Args:
-            **kwargs: Configuration options for the CodeAgent
+            **kwargs: Configuration options for the CodeAgent. These are passed directly
+                to the smolagents CodeAgent constructor and may include options like
+                grammar, additional_authorized_imports, planning_interval, etc.
 
         Returns:
             Configured smolagents CodeAgent instance

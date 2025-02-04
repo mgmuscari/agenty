@@ -1,0 +1,62 @@
+site_name: "agenty"
+repo_url: https://github.com/jonchun/agenty
+nav:
+- Introduction: index.md
+- Quick Start:
+  - "Installation": quickstart/install.md
+  - "Getting Started": quickstart/getting_started.md
+- Key Features:
+  - Tools: documentation/tools.md
+  - Structured I/O: documentation/structured_io.md
+  - Pipelines: documentation/pipelines.md
+  - Templates: documentation/templates.md
+- "Documentation":
+  - Agent Configuration: documentation/agent_configuration.md
+- "Reference":
+  - agenty: agenty.md
+  - components:
+    - "memory": components/memory.md
+    - "usage": components/usage.md
+  - integrations:
+    - "smol": integrations/smol.md
+  - exceptions: exceptions.md
+  - types: types.md
+
+theme:
+  name: "material"
+  palette:
+  - media: "(prefers-color-scheme: light)"
+    scheme: default
+    primary: black
+    accent: blue
+    toggle:
+      icon: material/weather-night
+      name: Switch to dark mode
+
+  - media: "(prefers-color-scheme: dark)"
+    scheme: slate
+    primary: black
+    accent: blue
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to light mode
+  features:
+  - navigation.instant
+  - navigation.tracking
+  - toc.follow
+  # - toc.integrate
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        options:
+          filters:
+          - "!^_"
+markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+
+extra_css:
+- stylesheets/extra.css
