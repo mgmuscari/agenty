@@ -17,7 +17,8 @@ from pydantic_ai.models.openai import OpenAIModel
 
 class RouletteAgent(Agent):
     model = OpenAIModel("gpt-4o", api_key="your-api-key")
-    system_prompt = "You're a dice game, you should roll the die and see if the number matches the user's guess."
+    system_prompt = ('You\'re a dice game, you should roll the die '
+                    'and see if the number matches the user\'s guess.')
 
     def __init__(self, player_name: str, num_sides: int = 10, **kwargs):
         super().__init__(**kwargs)

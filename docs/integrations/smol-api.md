@@ -1,0 +1,1 @@
+::: agenty.integrations.smol

@@ -1,32 +1,43 @@
+# Project information
 site_name: "agenty"
 site_url: !ENV [ READTHEDOCS_CANONICAL_URL, "https://agenty.readthedocs.io/" ]
 repo_url: https://github.com/jonchun/agenty
+
+# Navigation structure
 nav:
-- Introduction: index.md
-- Quick Start:
-  - "Installation": quickstart/install.md
-  - "Getting Started": quickstart/getting_started.md
-- Key Features:
+- Home: index.md
+- Getting Started:
+  - Installation: quickstart/install.md
+  - Getting Started: quickstart/getting_started.md
+- Highlights:
   - Tools: documentation/tools.md
   - Structured I/O: documentation/structured_io.md
   - Pipelines: documentation/pipelines.md
   - Templates: documentation/templates.md
-- "Documentation":
+- User Guide:
   - Agent Configuration: documentation/agent_configuration.md
-- "Reference":
-  - agenty: agenty.md
-  - components:
-    - "memory": components/memory.md
-    - "usage": components/usage.md
-  - integrations:
-    - "smol": integrations/smol.md
-  - exceptions: exceptions.md
-  - types: types.md
-extra_javascript:
-- javascript/readthedocs.js
+- Integrations:
+  - smolagents: integrations/smol.md
+- API Reference:
+  - Core: agenty.md
+  - Components:
+    - Memory: components/memory.md
+    - Usage: components/usage.md
+  - Integrations:
+    - smol: integrations/smol-api.md
+  - Exceptions: exceptions.md
+  - Types: types.md
+
+# Theme configuration
 theme:
   name: "material"
   custom_dir: docs/overrides
+  features:
+  - navigation.instant
+  - navigation.tracking
+  - toc.follow
+  - content.code.copy
+
   palette:
   - media: "(prefers-color-scheme: light)"
     scheme: default
@@ -35,7 +46,6 @@ theme:
     toggle:
       icon: material/weather-night
       name: Switch to dark mode
-
   - media: "(prefers-color-scheme: dark)"
     scheme: slate
     primary: black
@@ -43,11 +53,8 @@ theme:
     toggle:
       icon: material/weather-sunny
       name: Switch to light mode
-  features:
-  - navigation.instant
-  - navigation.tracking
-  - toc.follow
-  # - toc.integrate
+
+# Plugin configuration
 plugins:
 - search
 - mkdocstrings:
@@ -56,10 +63,15 @@ plugins:
         options:
           filters:
           - "!^_"
+
+# Markdown extensions
 markdown_extensions:
 - admonition
 - pymdownx.details
 - pymdownx.superfences
 
+# Additional assets
 extra_css:
 - stylesheets/extra.css
+extra_javascript:
+- javascript/readthedocs.js
