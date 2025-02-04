@@ -7,7 +7,7 @@ from pydantic_ai.result import RunResult
 from pydantic_ai.models import ModelSettings
 
 from agenty import Agent
-from agenty.exceptions import AgentyValueError
+from agenty.exceptions import AgentyValueError, UnsupportedModel
 from agenty.types import BaseIO
 
 
@@ -163,6 +163,18 @@ async def test_agent_configuration():
     assert agent.result_retries == 2
     assert agent.end_strategy == "early"
     assert agent.name == "TestAgent"
+
+
+@pytest.mark.asyncio
+async def test_agent_model_none():
+    agent = Agent(
+        model=None,
+        input_schema=str,
+        output_schema=str,
+    )
+
+    with pytest.raises(UnsupportedModel):
+        await agent.run("test")
 
 
 @pytest.mark.asyncio

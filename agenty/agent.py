@@ -17,7 +17,7 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 
 from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
-from agenty.exceptions import AgentyValueError
+from agenty.exceptions import AgentyValueError, UnsupportedModel
 from agenty.pipeline import Pipeline
 from agenty.template import apply_template
 from agenty.types import (
@@ -122,7 +122,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         end_strategy (EndStrategy): Strategy for ending conversations
     """
 
-    model: Union[KnownModelName, Model] = "gpt-4o"
+    model: Union[KnownModelName, Model, None] = None
     system_prompt: str = ""
     model_settings: Optional[ModelSettings] = None
     input_schema: Type[AgentIO] = str
@@ -131,13 +131,13 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     result_retries: Optional[int] = None
     end_strategy: EndStrategy = "early"
 
-    _pai_agent: pai.Agent["Agent[Any, Any]", AgentIO]
+    _pai_agent: Optional[pai.Agent["Agent[Any, Any]", AgentIO]]
     _input_hooks: List[Callable]
     _output_hooks: List[Callable]
 
     def __init__(
         self,
-        model: Union[KnownModelName, Model] | NOT_GIVEN = NOT_GIVEN_,
+        model: Union[KnownModelName, Model] | None = None,
         model_settings: Optional[ModelSettings] | NOT_GIVEN = NOT_GIVEN_,
         input_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
         output_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
@@ -174,8 +174,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         # Update instance attributes if provided
         _regenerate_pai_agent = False
-        if not isinstance(model, NOT_GIVEN):
-            self.model = model
+        self.model = model
+        if model is not None:
             _regenerate_pai_agent = True
         if not isinstance(model_settings, NOT_GIVEN):
             self.model_settings = model_settings
@@ -199,15 +199,17 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         # If any attributes were updated, recreate the pydantic-ai agent
         if _regenerate_pai_agent:
             logger.debug("Creating object-specific pydantic-ai agent")
-            self._pai_agent = pai.Agent(
-                self.model,
-                result_type=self.output_schema,
-                deps_type=self.__class__,
-                model_settings=self.model_settings,
-                retries=self.retries,
-                result_retries=self.result_retries,
-                end_strategy=self.end_strategy,
-            )
+            self._pai_agent = None
+            if model is not None:
+                self._pai_agent = pai.Agent(
+                    self.model,
+                    result_type=self.output_schema,
+                    deps_type=self.__class__,
+                    model_settings=self.model_settings,
+                    retries=self.retries,
+                    result_retries=self.result_retries,
+                    end_strategy=self.end_strategy,
+                )
 
     async def run(
         self,
@@ -326,6 +328,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         Returns:
             pai.Agent: The pydantic-ai agent instance
         """
+        if self._pai_agent is None:
+            raise UnsupportedModel("Pydantic AI agent does not exist")
         return self._pai_agent
 
     def get_input_schema(self) -> AgentInputT:
