@@ -1,12 +1,13 @@
-from typing import Generic, Type, Protocol
+from typing import Generic, Type, Protocol, Optional, Dict, Any
 from typing_extensions import TypeVar
+from agenty.components.memory import AgentMemory
 from agenty.types import AgentIO, AgentInputT, AgentOutputT, PipelineOutputT
 
 
-__all__ = ["AgentProtocol"]
+__all__ = ["AgentProtocol", "AgentIOProtocol"]
 
 
-class AgentProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
+class AgentIOProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
     @property
     def input_schema(self) -> Type[AgentIO]: ...
     @property
@@ -15,9 +16,22 @@ class AgentProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
     async def run(
         self,
         input_data: AgentInputT,
+        name: Optional[str] = None,
+        skip_memory: bool = False,
     ) -> AgentOutputT: ...
 
     def __or__(
         self,
-        other: "AgentProtocol[AgentOutputT, PipelineOutputT]",
-    ) -> "AgentProtocol[AgentInputT, PipelineOutputT]": ...
+        other: "AgentIOProtocol[AgentOutputT, PipelineOutputT]",
+    ) -> "AgentIOProtocol[AgentInputT, PipelineOutputT]": ...
+
+
+class AgentProtocol(AgentIOProtocol[AgentInputT, AgentOutputT]):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def memory(self) -> AgentMemory: ...
+
+    @memory.setter
+    def memory(self, value: AgentMemory) -> None: ...

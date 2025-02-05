@@ -28,7 +28,7 @@ from agenty.types import (
     NOT_GIVEN,
     NOT_GIVEN_,
 )
-from agenty.protocol import AgentProtocol
+from agenty.protocol import AgentIOProtocol
 
 __all__ = ["Agent"]
 
@@ -214,6 +214,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     async def run(
         self,
         input_data: AgentInputT,
+        name: Optional[str] = None,
+        skip_memory: bool = False,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
 
@@ -230,8 +232,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Input hook {input_hook.__name__} returned invalid type"
                 )
-
-        self.memory.add("user", input_data)
+        if not skip_memory:
+            self.memory.add("user", input_data, name=name)
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
@@ -256,7 +258,9 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Output hook {output_hook.__name__} returned invalid type"
                 )
-        self.memory.add("assistant", output.data)
+
+        if not skip_memory:
+            self.memory.add("assistant", output.data, name=self.name)
         return cast(AgentOutputT, output.data)
 
     # async def run_stream(
@@ -339,8 +343,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         return cast(AgentOutputT, self.output_schema)
 
     def __or__(
-        self, other: AgentProtocol[AgentOutputT, PipelineOutputT]
-    ) -> AgentProtocol[AgentInputT, PipelineOutputT]:
+        self, other: AgentIOProtocol[AgentOutputT, PipelineOutputT]
+    ) -> AgentIOProtocol[AgentInputT, PipelineOutputT]:
         return Pipeline[AgentInputT, PipelineOutputT](
             agents=[self, other],
             input_schema=self.input_schema,

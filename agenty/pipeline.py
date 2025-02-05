@@ -7,39 +7,10 @@ from agenty.types import (
     PipelineOutputT,
     NOT_GIVEN,
     NOT_GIVEN_,
-    is_sequence_type,
-    get_sequence_item_type,
+    matches_schema,
 )
-from agenty.exceptions import AgentyTypeError
-from agenty.protocol import AgentProtocol
-
-
-def _validate_schema(data: Any, schema: Type[AgentIO], context: str) -> None:
-    """Validate that data matches the expected schema type.
-
-    Args:
-        data: The data to validate
-        schema: The expected schema type
-        context: Context string for error message (e.g. 'input' or 'output')
-
-    Raises:
-        AgentyTypeError: If data type doesn't match the schema
-    """
-    check_type: Any = type(data)
-    check_schema: Any = schema
-
-    if is_sequence_type(check_type) and is_sequence_type(schema):
-        check_schema = get_sequence_item_type(schema)
-        try:
-            check_type = type(data[0])
-        except IndexError:
-            # list is empty so technically type is correct
-            check_type = check_schema
-
-    if check_type is not check_schema:
-        raise AgentyTypeError(
-            f"{context.capitalize()} data type {type(data)} does not match schema {schema}"
-        )
+from agenty.exceptions import AgentyTypeError, AgentyValueError
+from agenty.protocol import AgentIOProtocol
 
 
 class Pipeline(Generic[AgentInputT, AgentOutputT]):
@@ -70,7 +41,7 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
 
     def __init__(
         self,
-        agents: List[AgentProtocol[Any, Any]] = list(),
+        agents: List[AgentIOProtocol[Any, Any]] = list(),
         input_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
         output_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
     ) -> None:
@@ -87,6 +58,8 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
     async def run(
         self,
         input_data: AgentInputT,
+        name: Optional[str] = None,
+        skip_memory: bool = False,
     ) -> AgentOutputT:
         """Run the pipeline by executing each agent in sequence.
 
@@ -101,32 +74,46 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         Raises:
             AgentyTypeError: If input data type doesn't match an agent's input schema,
                 or if an agent's output type doesn't match the pipeline's output schema.
+            AgentyValueError: If the pipeline contains no agents.
         """
         current_input: Any = input_data
         output: Any = None
         self.current_step = 0
 
+        agent = None
         for agent in self.agents:
-            _validate_schema(
+            if not matches_schema(
                 data=current_input,
                 schema=agent.input_schema,
-                context="input",
+            ):
+                raise AgentyTypeError(
+                    f"Input data type {type(current_input)} does not match schema {agent.input_schema}"
+                )
+            output = await agent.run(
+                current_input,
+                name=name,
+                skip_memory=skip_memory,
             )
-            output = await agent.run(current_input)
             current_input = output
             self.output_history.append(output)
             self.current_step += 1
 
-        _validate_schema(
+        if agent is None:
+            raise AgentyValueError("Pipeline must contain at least one agent")
+
+        if not matches_schema(
             data=output,
             schema=self.output_schema,
-            context="output",
-        )
+        ):
+            raise AgentyTypeError(
+                f"Output data type {type(current_input)} does not match schema {agent.input_schema}"
+            )
+
         return output
 
     def __or__(
-        self, other: AgentProtocol[AgentOutputT, PipelineOutputT]
-    ) -> AgentProtocol[AgentInputT, PipelineOutputT]:
+        self, other: AgentIOProtocol[AgentOutputT, PipelineOutputT]
+    ) -> AgentIOProtocol[AgentInputT, PipelineOutputT]:
         """Chain this pipeline with another agent using the | operator.
 
         This enables fluent pipeline construction using the | operator to chain

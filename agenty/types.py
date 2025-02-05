@@ -109,3 +109,27 @@ def get_sequence_item_type(output_type: Any) -> Optional[Any]:
         return get_args(output_type)[0]
     except IndexError:
         return None
+
+
+def matches_schema(data: Any, schema: type) -> bool:
+    """Check if the given value matches the expected schema type. Supports sequence types.
+
+    Args:
+        data: The data to validate
+        schema: The expected schema type
+
+    Raises:
+        AgentyTypeError: If data type doesn't match the schema
+    """
+    check_type: Any = type(data)
+    check_schema: Any = schema
+
+    if is_sequence_type(check_type) and is_sequence_type(schema):
+        check_schema = get_sequence_item_type(schema)
+        try:
+            check_type = type(data[0])
+        except IndexError:
+            # list is empty so technically type is correct
+            check_type = check_schema
+
+    return check_type is check_schema

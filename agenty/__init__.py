@@ -1,6 +1,5 @@
 from .agent import Agent
 from .pipeline import Pipeline
-from .protocol import AgentProtocol
 from .decorators import tool, hook
 from . import types
 from . import components
@@ -13,5 +12,4 @@ __all__ = [
     "types",
     "components",
     "Pipeline",
-    "AgentProtocol",
 ]

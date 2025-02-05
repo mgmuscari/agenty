@@ -87,11 +87,29 @@ class ChatMessage(BaseModel):
         """
         match self.role:
             case "user":
-                return ModelRequest(parts=[UserPromptPart(self.content_str(ctx))])
+                return ModelRequest(
+                    parts=[
+                        UserPromptPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case "system":
-                return ModelRequest(parts=[SystemPromptPart(self.content_str(ctx))])
+                return ModelRequest(
+                    parts=[
+                        SystemPromptPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case "assistant":
-                return ModelResponse(parts=[TextPart(self.content_str(ctx))])
+                return ModelResponse(
+                    parts=[
+                        TextPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case _:
                 raise ValueError(f"Unsupported role: {self.role}")
 
