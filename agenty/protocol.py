@@ -17,7 +17,6 @@ class AgentIOProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
         self,
         input_data: AgentInputT,
         name: Optional[str] = None,
-        skip_memory: bool = False,
     ) -> AgentOutputT: ...
 
     def __or__(

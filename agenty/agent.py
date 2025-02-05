@@ -215,7 +215,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         self,
         input_data: AgentInputT,
         name: Optional[str] = None,
-        skip_memory: bool = False,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
 
@@ -232,8 +231,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Input hook {input_hook.__name__} returned invalid type"
                 )
-        if not skip_memory:
-            self.memory.add("user", input_data, name=name)
+        self.memory.add("user", input_data, name=name)
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
@@ -246,7 +244,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             deps=self,
             usage_limits=self.usage_limits[self.model_name],
             usage=self.usage[self.model_name],
-            # Note: Omitting result_type allows None schema which enables raw text responses
         )
         if output.data is None:
             raise AgentyValueError("No data returned from agent")
@@ -259,8 +256,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                     f"Output hook {output_hook.__name__} returned invalid type"
                 )
 
-        if not skip_memory:
-            self.memory.add("assistant", output.data, name=self.name)
+        self.memory.add("assistant", output.data, name=self.name)
         return cast(AgentOutputT, output.data)
 
     # async def run_stream(

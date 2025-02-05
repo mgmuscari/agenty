@@ -60,7 +60,6 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         self,
         input_data: AgentInputT,
         name: Optional[str] = None,
-        skip_memory: bool = False,
     ) -> AgentOutputT:
         """Run the pipeline by executing each agent in sequence.
 
@@ -94,7 +93,6 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
             output = await agent.run(
                 typed_input,
                 name=name,
-                skip_memory=skip_memory,
             )
             current_input = output
             self.output_history.append(output)

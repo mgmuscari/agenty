@@ -167,7 +167,6 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         self,
         input_data: AgentInputT,
         name: Optional[str] = None,
-        skip_memory: bool = False,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
 
