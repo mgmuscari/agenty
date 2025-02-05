@@ -1,9 +1,9 @@
-from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable
+from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable, List
 from collections.abc import MutableSequence
 import uuid
 
 from openai.types.chat import ChatCompletionMessageParam
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -13,7 +13,7 @@ from pydantic_ai.messages import (
     TextPart,
 )
 from agenty.template import apply_template
-from agenty.types import AgentIO, is_sequence_type
+from agenty.types import AgentIO
 import agenty.exceptions as exc
 
 __all__ = ["ChatMessage", "AgentMemory", "Role"]
@@ -272,13 +272,11 @@ class AgentMemory(MutableSequence[ChatMessage]):
             TypeError: If value type doesn't match index type
         """
         if isinstance(index, slice):
-            if not is_sequence_type(type(value)):
-                raise exc.AgentyTypeError("Can only assign sequence to slice")
-            for val in value:
-                if not isinstance(val, ChatMessage):
-                    raise exc.AgentyTypeError("Can only assign ChatMessage")
-            if isinstance(value, ChatMessage):
-                raise exc.AgentyTypeError("Can only assign sequence to slice")
+            adapter = TypeAdapter(List[ChatMessage])
+            try:
+                value = adapter.validate_python(value)
+            except ValidationError:
+                raise exc.AgentyTypeError("Can only assign sequence of ChatMessages")
             self._messages[index] = value
         else:
             if not isinstance(value, ChatMessage):

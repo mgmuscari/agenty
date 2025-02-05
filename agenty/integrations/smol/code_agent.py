@@ -1,17 +1,15 @@
 import asyncio
 import json
 import os
-from typing import Dict, List, Any, cast
+from typing import Dict, List, Any, cast, Optional, Union
 from pydantic.type_adapter import TypeAdapter
 from pydantic import ValidationError
 from agenty import Agent
-from agenty.exceptions import UnsupportedModel, InvalidResponse
+from agenty.exceptions import UnsupportedModel, InvalidResponse, AgentyTypeError
 from agenty.types import (
     AgentInputT,
     AgentOutputT,
     BaseIO,
-    is_sequence_type,
-    get_sequence_item_type,
 )
 
 try:
@@ -31,52 +29,6 @@ except ImportError as _import_error:
         "Please install `smolagents` to use this integration: "
         "you can use the `smol` optional group — `pip install 'agenty[smol]'`"
     ) from _import_error
-
-
-def gen_schema_instructions(output_type: Any) -> str:
-    """Generate schema instructions for the given output type.
-
-    Args:
-        output_type: The type to generate instructions for
-
-    Returns:
-        A string containing schema instructions for the model
-
-    Raises:
-        ValueError: If the output type is not supported
-    """
-    # Handle string type (default)
-    if output_type is str:
-        return ""
-
-    # Handle sequence types
-    if is_sequence_type(output_type):
-        item_type = get_sequence_item_type(output_type)
-
-        # Handle different sequence item types
-        if item_type is str or item_type is None:
-            return 'Example Final Output Format: ["apple", "banana", "cherry"]'
-
-        if isinstance(item_type, type):
-            if issubclass(item_type, BaseIO):
-                schema = json.dumps([item_type.model_json_schema()])
-                return f"""Your final output must strictly adhere to the following JSON schema: {{"type": "array", "items": {schema}}}"""
-            elif item_type is int:
-                return "Your final output must be a JSON list of integers. Example: [1, 2, 3]"
-            elif item_type is float:
-                return "Your final output must be a JSON list of floats. Example: [1.1, 2.501, 3.14]"
-
-    # Handle Pydantic models
-    if isinstance(output_type, type) and issubclass(output_type, BaseIO):
-        schema = json.dumps(output_type.model_json_schema())
-        return f"Your final output must strictly adhere to the following JSON schema: {schema}"
-
-    # Handle primitive types
-    primitive_types = {bool: "bool", int: "int", float: "float"}
-    if output_type in primitive_types:
-        return f"Your final output should be of the following data type: {primitive_types[output_type]}"
-
-    raise ValueError(f"Unsupported output type: {output_type}")
 
 
 class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
@@ -211,7 +163,12 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         else:
             raise UnsupportedModel(f"{type(pai_model)} not supported")
 
-    async def run(self, input_data: AgentInputT) -> AgentOutputT:
+    async def run(
+        self,
+        input_data: AgentInputT,
+        name: Optional[str] = None,
+        skip_memory: bool = False,
+    ) -> AgentOutputT:
         """Run the agent with the provided input.
 
         Args:
@@ -227,58 +184,22 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         if self.smol_agent is None:
             self.smol_agent = await self.get_smol_agent(**self._smol_kwargs)
         input_str = str(input_data)
-        schema_instructions = gen_schema_instructions(self.output_schema)
-        if schema_instructions:
-            input_str = f"{input_str}\n\n{schema_instructions}"
         self.memory.add("user", input_str)
-        resp = await asyncio.to_thread(self.smol_agent.run, str(input_str))
+        resp = await asyncio.to_thread(self.smol_agent.run, input_str)
 
-        # Convert response to expected output type
-        try:
-            result = self._convert_response(resp)
-            self.memory.add("assistant", result)
-            return result
-        except ValidationError:
-            raise
-        except Exception as e:
-            raise InvalidResponse(f"Failed to convert response: {str(e)}")
-
-    def _convert_response(self, resp: Any) -> AgentOutputT:
-        """Convert the response to the expected output type.
-
-        Args:
-            resp: The response to convert
-
-        Returns:
-            The converted response
-
-        Raises:
-            ValueError: If the response type is not supported
-        """
-        # Handle string output
-        if self.output_schema is str:
-            return cast(AgentOutputT, str(resp))
-
-        # Handle AgentText responses
         if isinstance(resp, AgentText):
-            if self.output_schema is str:
-                return cast(AgentOutputT, resp.to_string())
-            return cast(
-                AgentOutputT,
-                TypeAdapter(self.output_schema).validate_strings(resp.to_raw()),
+            resp = resp.to_string()
+
+        try:
+            adapter = TypeAdapter(self.output_schema)
+
+            typed_resp = adapter.validate_strings(str(resp))
+        except ValidationError:
+            # Special case for converting float to int. Unsure if desirable.
+            if isinstance(resp, float) and self.output_schema is int:
+                return cast(AgentOutputT, int(resp))
+            raise AgentyTypeError(
+                f"Unable to convert response to expected type. Response Type: {type(resp)} | Schema: {self.output_schema}"
             )
 
-        # Handle primitive types
-        if isinstance(resp, (int, float, bool)):
-            type_mapping = {int: int, float: float, bool: bool}
-            if self.output_schema in type_mapping:
-                return cast(AgentOutputT, type_mapping[self.output_schema](resp))
-
-        # Handle sequences
-        if isinstance(resp, (list, tuple)):
-            if self.output_schema is list:
-                return cast(AgentOutputT, list(resp))
-            if self.output_schema is tuple:
-                return cast(AgentOutputT, tuple(resp))
-
-        raise ValueError(f"Unsupported response type: {type(resp)}")
+        return cast(AgentOutputT, typed_resp)

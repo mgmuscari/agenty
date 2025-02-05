@@ -1,5 +1,7 @@
 from typing import Any, Generic, List, Type, Optional
 
+from pydantic import TypeAdapter, ValidationError
+
 from agenty.types import (
     AgentIO,
     AgentInputT,
@@ -7,7 +9,6 @@ from agenty.types import (
     PipelineOutputT,
     NOT_GIVEN,
     NOT_GIVEN_,
-    matches_schema,
 )
 from agenty.exceptions import AgentyTypeError, AgentyValueError
 from agenty.protocol import AgentIOProtocol
@@ -81,16 +82,17 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         self.current_step = 0
 
         agent = None
+
         for agent in self.agents:
-            if not matches_schema(
-                data=current_input,
-                schema=agent.input_schema,
-            ):
+            adapter = TypeAdapter(agent.input_schema)
+            try:
+                typed_input = adapter.validate_python(current_input)
+            except ValidationError:
                 raise AgentyTypeError(
                     f"Input data type {type(current_input)} does not match schema {agent.input_schema}"
                 )
             output = await agent.run(
-                current_input,
+                typed_input,
                 name=name,
                 skip_memory=skip_memory,
             )
@@ -101,12 +103,12 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
         if agent is None:
             raise AgentyValueError("Pipeline must contain at least one agent")
 
-        if not matches_schema(
-            data=output,
-            schema=self.output_schema,
-        ):
+        adapter = TypeAdapter(agent.output_schema)
+        try:
+            typed_input = adapter.validate_python(output)
+        except ValidationError:
             raise AgentyTypeError(
-                f"Output data type {type(current_input)} does not match schema {agent.input_schema}"
+                f"Input data type {type(current_input)} does not match schema {agent.output_schema}"
             )
 
         return output

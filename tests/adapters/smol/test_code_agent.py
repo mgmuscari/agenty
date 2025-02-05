@@ -2,9 +2,11 @@ from unittest.mock import Mock
 
 import pytest
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.models.function import FunctionModel
 from pydantic_core import ValidationError
 
 from agenty.integrations.smol.code_agent import SmolCodeAgent
+from agenty.exceptions import AgentyTypeError
 
 from smolagents.default_tools import PythonInterpreterTool
 
@@ -70,6 +72,6 @@ async def test_code_no_return():
     )
     agent.get_smol_model = Mock(return_value=fake_code_model_no_return)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(AgentyTypeError):
         pass
         await agent.run("What is 2 multiplied by 3.6452?")
