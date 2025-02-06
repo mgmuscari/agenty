@@ -1,6 +1,6 @@
-from typing import Union, TypedDict, Sequence, Any, Optional
+from typing import Union, Tuple, Sequence, Any, Type, get_origin, get_args, List
+
 from typing_extensions import TypeVar
-from typing_inspect import get_args
 
 from pydantic import BaseModel
 from rich.json import JSON
@@ -92,3 +92,11 @@ class NOT_GIVEN:
 
 
 NOT_GIVEN_ = NOT_GIVEN()
+
+
+def normalize_type(type_: Any) -> Tuple[Type, Tuple[Any]]:
+    """Normalize a type annotation to a standard form."""
+    # If there's no origin, return the type itself
+    origin = get_origin(type_) or type_
+    args = get_args(type_)
+    return (origin, args)

@@ -15,7 +15,7 @@ class AgentIOProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
 
     async def run(
         self,
-        input_data: AgentInputT,
+        input_data: Optional[AgentInputT],
         name: Optional[str] = None,
     ) -> AgentOutputT: ...
 
@@ -25,7 +25,12 @@ class AgentIOProtocol(Generic[AgentInputT, AgentOutputT], Protocol):
     ) -> "AgentIOProtocol[AgentInputT, PipelineOutputT]": ...
 
 
-class AgentProtocol(AgentIOProtocol[AgentInputT, AgentOutputT]):
+class AgentProtocol(AgentIOProtocol[AgentInputT, AgentOutputT], Protocol):
+    @property
+    def input_schema(self) -> Type[AgentIO]: ...
+    @property
+    def output_schema(self) -> Type[AgentIO]: ...
+
     @property
     def name(self) -> str: ...
 

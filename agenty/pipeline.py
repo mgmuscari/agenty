@@ -58,7 +58,7 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
 
     async def run(
         self,
-        input_data: AgentInputT,
+        input_data: Optional[AgentInputT],
         name: Optional[str] = None,
     ) -> AgentOutputT:
         """Run the pipeline by executing each agent in sequence.

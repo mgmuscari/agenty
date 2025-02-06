@@ -1,181 +1,264 @@
 import pytest
-from unittest.mock import AsyncMock
-from pydantic_ai.models.test import TestModel
+from typing import List
 
-from agenty import Agent
-from agenty.exceptions import AgentyValueError
-from agenty.team import Team
+from pydantic_ai.models.function import FunctionModel, AgentInfo
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
+
+from agenty.team import Team, TextMentionStop, OutputSchemaStop
+from agenty.agent import Agent
 from agenty.types import BaseIO
+from agenty.exceptions import AgentyValueError
 
 
-class TestInput(BaseIO):
-    message: str
+# Fixtures
+@pytest.fixture
+def success_model() -> FunctionModel:
+    async def success_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("Output from success_agent")])
+
+    return FunctionModel(success_function)
 
 
-class TestOutput(BaseIO):
-    response: str
+@pytest.fixture
+def another_success_model() -> FunctionModel:
+    async def another_success_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("Output from another_success_agent")])
+
+    return FunctionModel(another_success_function)
 
 
+@pytest.fixture
+def success_agent(success_model) -> Agent[str, str]:
+    return Agent(
+        model=success_model,
+        name="success_agent",
+    )
+
+
+@pytest.fixture
+def another_success_agent(another_success_model) -> Agent[str, str]:
+    return Agent(
+        model=another_success_model,
+        name="another_success_agent",
+    )
+
+
+@pytest.fixture
+def intermediate_model() -> FunctionModel:
+    async def intermediate_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("Output from intermediate_agent")])
+
+    return FunctionModel(intermediate_function)
+
+
+@pytest.fixture
+def intermediate_agent(intermediate_model) -> Agent[str, str]:
+    return Agent(model=intermediate_model)
+
+
+@pytest.fixture
+def none_model() -> FunctionModel:
+    async def none_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(parts=[])
+
+    return FunctionModel(none_function)
+
+
+@pytest.fixture
+def none_agent(none_model) -> Agent[str, str]:
+    return Agent(model=none_model)
+
+
+# Test classes and fixtures
+class Pizza(BaseIO):
+    toppings: List[str]
+    crust: str
+
+
+class Rating(BaseIO):
+    score: int
+    comment: str
+
+
+# Test cases
 @pytest.mark.asyncio
-async def test_team_initialization():
-    agent1 = Agent(
-        model=TestModel(),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-        name="agent1",
-    )
-    agent2 = Agent(
-        model=TestModel(),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-        name="agent2",
-    )
+class TestTeam:
+    """Test Team initialization and basic functionality"""
 
-    team = Team(
-        agents={"agent1": agent1, "agent2": agent2},
-        input_schema=TestInput,
-        output_schema=TestOutput,
-    )
+    async def test_initialization(self, success_agent, another_success_agent):
+        """Test basic team initialization"""
+        team = Team(agents=[success_agent, another_success_agent])
+        assert len(team.agents) == 2
 
-    assert len(team.agents) == 2
-    assert team.get_agent("agent1") == agent1
-    assert team.get_agent("agent2") == agent2
-    assert team.input_schema == TestInput
-    assert team.output_schema == TestOutput
+        """Test initialization with custom IO schemas"""
+        team_with_schema = Team(
+            agents=[success_agent, another_success_agent],
+            input_schema=Pizza,
+            output_schema=Rating,
+        )
+        assert team_with_schema.input_schema == Pizza
+        assert team_with_schema.output_schema == Rating
 
+    async def test_initialization_errors(self, success_model):
+        """Test initialization error cases"""
+        with pytest.raises(AgentyValueError, match="Team must have at least one agent"):
+            Team(agents=[])
 
-@pytest.mark.asyncio
-async def test_team_run_agent():
-    agent1 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"response": "Hello from agent1"},
-        ),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-    )
+        agent1 = Agent(model=success_model, name="agent1")
+        agent2 = Agent(model=success_model, name="agent1")
+        with pytest.raises(
+            AgentyValueError, match="Agent 'agent1' already exists in team"
+        ):
+            Team(agents=[agent1, agent2])
 
-    team = Team(agents={"agent1": agent1})
-    result = await team.run(
-        TestInput(message="Hello"),
-        agent_name="agent1",
-    )
+    async def test_subscriptions(self, success_model):
+        """Test agent subscriptions and type handling"""
+        pizza_maker = Agent(
+            model=success_model,
+            output_schema=Pizza,
+            name="pizza_maker",
+        )
+        pizza_rater = Agent(
+            model=success_model,
+            input_schema=Pizza,
+            output_schema=Rating,
+            name="pizza_rater",
+        )
+        team = Team(agents=[pizza_maker, pizza_rater])
 
-    assert isinstance(result, TestOutput)
-    assert result.response == "Hello from agent1"
+        """Verify Pizza type subscription"""
+        pizza_subs = team.subscriptions.get((Pizza, ()))
+        assert pizza_subs and len(pizza_subs) == 1
+        assert pizza_rater in pizza_subs
 
-    # Test running non-existent agent
-    with pytest.raises(AgentyValueError):
-        await team.run(
-            TestInput(message="Hello"),
-            agent_name="non_existent",
+    async def test_structured_io(self):
+        """Test team with structured IO types"""
+
+        class Order(BaseIO):
+            items: List[str]
+            priority: int
+
+        class Response(BaseIO):
+            status: str
+            eta: int
+
+        async def output_order_model(
+            messages: list[ModelMessage], info: AgentInfo
+        ) -> ModelResponse:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="final_result",
+                        args={
+                            "items": ["pizza", "burger"],
+                            "priority": 1,
+                        },
+                        tool_call_id=None,
+                    )
+                ],
+            )
+
+        async def output_response_model(
+            messages: list[ModelMessage], info: AgentInfo
+        ) -> ModelResponse:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="final_result",
+                        args={
+                            "status": "Order received",
+                            "eta": 10,
+                        },
+                        tool_call_id=None,
+                    )
+                ],
+            )
+
+        order_taker = Agent(
+            model=FunctionModel(output_order_model),
+            input_schema=str,
+            output_schema=Order,
+            name="order_taker",
+        )
+        processor = Agent[Order, Response](
+            model=FunctionModel(output_response_model),
+            input_schema=Order,
+            output_schema=Response,
+            name="processor",
         )
 
-
-@pytest.mark.asyncio
-async def test_team_broadcast():
-    agent1 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"response": "Response from agent1"},
-        ),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-        name="agent1",
-    )
-    agent2 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"response": "Response from agent2"},
-        ),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-        name="agent2",
-    )
-
-    team = Team(agents={"agent1": agent1, "agent2": agent2})
-
-    # Test broadcast to all agents
-    responses = await team.broadcast(
-        TestInput(message="Broadcast message"),
-        from_agent="agent1",
-    )
-
-    assert len(responses) == 1  # Should only include agent2's response
-    assert isinstance(responses["agent2"], TestOutput)
-    assert responses["agent2"].response == "Response from agent2"
-
-    # Test broadcast to specific agents
-    responses = await team.broadcast(
-        TestInput(message="Targeted message"),
-        from_agent="agent1",
-        to_agents=["agent2"],
-    )
-
-    assert len(responses) == 1
-    assert responses["agent2"].response == "Response from agent2"
-
-    # Test broadcast from non-existent agent
-    with pytest.raises(AgentyValueError):
-        await team.broadcast(
-            TestInput(message="Invalid broadcast"),
-            from_agent="non_existent",
+        team = Team[str, Response](
+            agents=[order_taker, processor],
+            input_schema=str,
+            output_schema=Response,
+            stop_condition=OutputSchemaStop(),
         )
 
+        """Verify type subscriptions"""
+        assert (str, ()) in team.subscriptions
+        assert (Order, ()) in team.subscriptions
 
-@pytest.mark.asyncio
-async def test_team_shared_memory():
-    agent1 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"response": "First response"},
-        ),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-    )
-    agent2 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"response": "Second response"},
-        ),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-    )
+        """Test run with structured IO"""
+        await team.run("I want to order a pizza")
 
-    team = Team(agents={"agent1": agent1, "agent2": agent2})
+    async def test_error_cases(self, success_agent, another_success_agent):
+        """Test error handling cases"""
+        team = Team(agents=[success_agent, another_success_agent])
 
-    # Run agents sequentially
-    await team.run(TestInput(message="First message"), "agent1")
-    await team.run(TestInput(message="Second message"), "agent2")
+        """Test None input handling"""
+        with pytest.raises(AgentyValueError, match="Team input data cannot be None"):
+            await team.run(None)
 
-    # Check conversation history
-    history = team.get_conversation_history()
-    assert len(history) == 4  # 2 user messages + 2 assistant responses
+    async def test_list_type_subscriptions(self, success_model):
+        async def list_output_model(
+            messages: list[ModelMessage], info: AgentInfo
+        ) -> ModelResponse:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="final_result",
+                        args={
+                            "response": [1, 2, 3],
+                        },
+                        tool_call_id=None,
+                    )
+                ],
+            )
 
-    # Verify memory is shared between agents
-    assert agent1.memory == team.memory
-    assert agent2.memory == team.memory
+        """Test list type handling in subscriptions"""
+        list_output_agent = Agent[List[str], List[int]](
+            model=FunctionModel(list_output_model),
+            input_schema=List[str],
+            output_schema=List[int],
+            name="list_output_agent",
+        )
+        list_input_agent = Agent(
+            model=success_model,
+            input_schema=List[int],
+            output_schema=str,
+            name="list_input_agent",
+        )
 
+        """Create team with list input schema"""
+        team = Team[List[str], str](
+            agents=[list_output_agent, list_input_agent],
+            input_schema=List[str],
+            output_schema=str,
+            stop_condition=TextMentionStop(text="Output from"),
+        )
 
-@pytest.mark.asyncio
-async def test_team_agent_names():
-    # Test automatic name assignment
-    unnamed_agent = Agent(
-        model=TestModel(),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-    )
+        """Verify list type subscriptions"""
+        assert (list, (str,)) in team.subscriptions
 
-    team = Team(agents={"custom_name": unnamed_agent})
-    assert unnamed_agent.name == "custom_name"
+        """Test run with list input"""
+        result = await team.run(["test1", "test2"])
 
-    # Test preserving existing names
-    named_agent = Agent(
-        model=TestModel(),
-        input_schema=TestInput,
-        output_schema=TestOutput,
-        name="original_name",
-    )
-
-    team = Team(agents={"new_name": named_agent})
-    assert named_agent.name == "original_name"
+        assert "Output from success_agent" in result

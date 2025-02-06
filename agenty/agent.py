@@ -131,6 +131,9 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     result_retries: Optional[int] = None
     end_strategy: EndStrategy = "early"
 
+    memory: AgentMemory = AgentMemory()
+    name: str = ""
+
     _pai_agent: Optional[pai.Agent["Agent[Any, Any]", AgentIO]]
     _input_hooks: List[Callable]
     _output_hooks: List[Callable]
@@ -213,7 +216,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
     async def run(
         self,
-        input_data: AgentInputT,
+        input_data: Optional[AgentInputT],
         name: Optional[str] = None,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
@@ -231,20 +234,24 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Input hook {input_hook.__name__} returned invalid type"
                 )
-        self.memory.add("user", input_data, name=name)
+        if input_data is not None:
+            self.memory.add("user", input_data, name=name)
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
         ).to_pydantic_ai(ctx=self.template_context())
 
-        output = await self.pai_agent.run(
-            str(input_data),
-            message_history=[system_prompt]
-            + self.memory.to_pydantic_ai(ctx=self.template_context()),
-            deps=self,
-            usage_limits=self.usage_limits[self.model_name],
-            usage=self.usage[self.model_name],
-        )
+        try:
+            output = await self.pai_agent.run(
+                str(input_data),
+                message_history=[system_prompt]
+                + self.memory.to_pydantic_ai(ctx=self.template_context()),
+                deps=self,
+                usage_limits=self.usage_limits[self.model_name],
+                usage=self.usage[self.model_name],
+            )
+        except pai.exceptions.UnexpectedModelBehavior as e:
+            raise AgentyValueError(e)
         if output.data is None:
             raise AgentyValueError("No data returned from agent")
 

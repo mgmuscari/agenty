@@ -165,7 +165,7 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
 
     async def run(
         self,
-        input_data: AgentInputT,
+        input_data: Optional[AgentInputT],
         name: Optional[str] = None,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
@@ -182,6 +182,10 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         """
         if self.smol_agent is None:
             self.smol_agent = await self.get_smol_agent(**self._smol_kwargs)
+
+        if input_data is None:
+            return cast(AgentOutputT, "")
+
         input_str = str(input_data)
         self.memory.add("user", input_str)
         resp = await asyncio.to_thread(self.smol_agent.run, input_str)

@@ -1,9 +1,10 @@
 from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable, List
 from collections.abc import MutableSequence
+import json
 import uuid
 
 from openai.types.chat import ChatCompletionMessageParam
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError, PrivateAttr
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -12,6 +13,8 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     TextPart,
 )
+from rich.json import JSON
+
 from agenty.template import apply_template
 from agenty.types import AgentIO
 import agenty.exceptions as exc
@@ -45,6 +48,7 @@ class ChatMessage(BaseModel):
     content: AgentIO
     turn_id: Optional[str] = None
     name: Optional[str] = None
+    _inject_name: bool = PrivateAttr(default=False)
 
     def content_str(self, ctx: dict[str, Any] = {}) -> str:
         """Get message content as a string and render Jinja2 template.
@@ -55,7 +59,11 @@ class ChatMessage(BaseModel):
         Returns:
             str: Rendered message content
         """
-        return apply_template(self.content, ctx)
+
+        res = apply_template(self.content, ctx)
+        if self._inject_name and self.name:
+            res = f"[{self.name}] {res}"
+        return res
 
     def to_openai(self, ctx: dict[str, Any] = {}) -> ChatCompletionMessageParam:
         """Convert message to OpenAI API format.
@@ -113,6 +121,14 @@ class ChatMessage(BaseModel):
             case _:
                 raise ValueError(f"Unsupported role: {self.role}")
 
+    def __rich__(self) -> JSON:
+        """Create a rich console representation of the model.
+
+        Returns:
+            JSON: Rich-formatted JSON representation
+        """
+        return JSON(json.dumps(self.to_openai()))
+
 
 class AgentMemory(MutableSequence[ChatMessage]):
     """Manages conversation history for an AI agent.
@@ -145,6 +161,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
         role: Role,
         content: AgentIO,
         name: Optional[str] = None,
+        inject_name: bool = False,
     ) -> None:
         """Add a message to history.
 
@@ -165,6 +182,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
             turn_id=self.current_turn_id,
             name=name,
         )
+        message._inject_name = inject_name
         self.append(message)
 
     def clear(self) -> None:
@@ -216,7 +234,10 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """
         return [msg.to_openai(ctx) for msg in self._messages]
 
-    def to_pydantic_ai(self, ctx: dict[str, Any] = {}) -> list[ModelMessage]:
+    def to_pydantic_ai(
+        self,
+        ctx: dict[str, Any] = {},
+    ) -> list[ModelMessage]:
         """Get history in Pydantic-AI format.
 
         Converts all messages in memory to the format expected by Pydantic-AI.
@@ -311,3 +332,27 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """
         self._messages.insert(index, value)
         self._cull_history()
+
+    def __repr__(self) -> str:
+        """Get string representation of memory.
+
+        Returns:
+            str: String representation of memory
+        """
+        return f"AgentMemory({self._messages!r})"
+
+    def __str__(self) -> str:
+        """Get string representation of memory.
+
+        Returns:
+            str: String representation of memory
+        """
+        return f"AgentMemory({self._messages!r})"
+
+    def __rich__(self) -> JSON:
+        """Create a rich console representation of the model.
+
+        Returns:
+            JSON: Rich-formatted JSON representation
+        """
+        return JSON(json.dumps([msg.to_openai() for msg in self._messages]))
