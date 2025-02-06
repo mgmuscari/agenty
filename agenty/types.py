@@ -1,6 +1,6 @@
-from typing import Union, TypedDict, Sequence, Any, Optional
+from typing import Union, Tuple, Sequence, Any, Type, get_origin, get_args, List
+
 from typing_extensions import TypeVar
-from typing_inspect import get_args
 
 from pydantic import BaseModel
 from rich.json import JSON
@@ -94,18 +94,9 @@ class NOT_GIVEN:
 NOT_GIVEN_ = NOT_GIVEN()
 
 
-def is_sequence_type(output_type: Any) -> bool:
-    """Check if the given output type is a sequence (list or tuple)."""
-    from typing_inspect import get_origin
-
-    return output_type in (list, tuple) or get_origin(output_type) in (list, tuple)
-
-
-def get_sequence_item_type(output_type: Any) -> Optional[Any]:
-    """Get the item type of a sequence type."""
-    if not is_sequence_type(output_type):
-        return None
-    try:
-        return get_args(output_type)[0]
-    except IndexError:
-        return None
+def normalize_type(type_: Any) -> Tuple[Type, Tuple[Any]]:
+    """Normalize a type annotation to a standard form."""
+    # If there's no origin, return the type itself
+    origin = get_origin(type_) or type_
+    args = get_args(type_)
+    return (origin, args)

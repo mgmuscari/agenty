@@ -17,7 +17,7 @@ from pydantic_ai.models import KnownModelName, Model, ModelSettings
 
 from agenty.components.memory import AgentMemory, ChatMessage
 from agenty.components.usage import AgentUsage, AgentUsageLimits
-from agenty.exceptions import AgentyValueError
+from agenty.exceptions import AgentyValueError, UnsupportedModel
 from agenty.pipeline import Pipeline
 from agenty.template import apply_template
 from agenty.types import (
@@ -28,7 +28,7 @@ from agenty.types import (
     NOT_GIVEN,
     NOT_GIVEN_,
 )
-from agenty.protocol import AgentProtocol
+from agenty.protocol import AgentIOProtocol
 
 __all__ = ["Agent"]
 
@@ -122,7 +122,7 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         end_strategy (EndStrategy): Strategy for ending conversations
     """
 
-    model: Union[KnownModelName, Model] = "gpt-4o"
+    model: Union[KnownModelName, Model, None] = None
     system_prompt: str = ""
     model_settings: Optional[ModelSettings] = None
     input_schema: Type[AgentIO] = str
@@ -131,13 +131,16 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     result_retries: Optional[int] = None
     end_strategy: EndStrategy = "early"
 
-    _pai_agent: pai.Agent["Agent[Any, Any]", AgentIO]
+    memory: AgentMemory = AgentMemory()
+    name: str = ""
+
+    _pai_agent: Optional[pai.Agent["Agent[Any, Any]", AgentIO]]
     _input_hooks: List[Callable]
     _output_hooks: List[Callable]
 
     def __init__(
         self,
-        model: Union[KnownModelName, Model] | NOT_GIVEN = NOT_GIVEN_,
+        model: Union[KnownModelName, Model] | None = None,
         model_settings: Optional[ModelSettings] | NOT_GIVEN = NOT_GIVEN_,
         input_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
         output_schema: Type[AgentIO] | NOT_GIVEN = NOT_GIVEN_,
@@ -174,8 +177,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         # Update instance attributes if provided
         _regenerate_pai_agent = False
-        if not isinstance(model, NOT_GIVEN):
-            self.model = model
+        self.model = model
+        if model is not None:
             _regenerate_pai_agent = True
         if not isinstance(model_settings, NOT_GIVEN):
             self.model_settings = model_settings
@@ -199,19 +202,22 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         # If any attributes were updated, recreate the pydantic-ai agent
         if _regenerate_pai_agent:
             logger.debug("Creating object-specific pydantic-ai agent")
-            self._pai_agent = pai.Agent(
-                self.model,
-                result_type=self.output_schema,
-                deps_type=self.__class__,
-                model_settings=self.model_settings,
-                retries=self.retries,
-                result_retries=self.result_retries,
-                end_strategy=self.end_strategy,
-            )
+            self._pai_agent = None
+            if model is not None:
+                self._pai_agent = pai.Agent(
+                    self.model,
+                    result_type=self.output_schema,
+                    deps_type=self.__class__,
+                    model_settings=self.model_settings,
+                    retries=self.retries,
+                    result_retries=self.result_retries,
+                    end_strategy=self.end_strategy,
+                )
 
     async def run(
         self,
-        input_data: AgentInputT,
+        input_data: Optional[AgentInputT],
+        name: Optional[str] = None,
     ) -> AgentOutputT:
         """Run the agent with the provided input.
 
@@ -228,22 +234,24 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Input hook {input_hook.__name__} returned invalid type"
                 )
-
-        self.memory.add("user", input_data)
+        if input_data is not None:
+            self.memory.add("user", input_data, name=name)
 
         system_prompt = ChatMessage(
             role="system", content=self.system_prompt
         ).to_pydantic_ai(ctx=self.template_context())
 
-        output = await self.pai_agent.run(
-            str(input_data),
-            message_history=[system_prompt]
-            + self.memory.to_pydantic_ai(ctx=self.template_context()),
-            deps=self,
-            usage_limits=self.usage_limits[self.model_name],
-            usage=self.usage[self.model_name],
-            # Note: Omitting result_type allows None schema which enables raw text responses
-        )
+        try:
+            output = await self.pai_agent.run(
+                str(input_data),
+                message_history=[system_prompt]
+                + self.memory.to_pydantic_ai(ctx=self.template_context()),
+                deps=self,
+                usage_limits=self.usage_limits[self.model_name],
+                usage=self.usage[self.model_name],
+            )
+        except pai.exceptions.UnexpectedModelBehavior as e:
+            raise AgentyValueError(e)
         if output.data is None:
             raise AgentyValueError("No data returned from agent")
 
@@ -254,7 +262,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
                 raise AgentyValueError(
                     f"Output hook {output_hook.__name__} returned invalid type"
                 )
-        self.memory.add("assistant", output.data)
+
+        self.memory.add("assistant", output.data, name=self.name)
         return cast(AgentOutputT, output.data)
 
     # async def run_stream(
@@ -326,6 +335,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         Returns:
             pai.Agent: The pydantic-ai agent instance
         """
+        if self._pai_agent is None:
+            raise UnsupportedModel("Pydantic AI agent does not exist")
         return self._pai_agent
 
     def get_input_schema(self) -> AgentInputT:
@@ -335,8 +346,8 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         return cast(AgentOutputT, self.output_schema)
 
     def __or__(
-        self, other: AgentProtocol[AgentOutputT, PipelineOutputT]
-    ) -> AgentProtocol[AgentInputT, PipelineOutputT]:
+        self, other: AgentIOProtocol[AgentOutputT, PipelineOutputT]
+    ) -> AgentIOProtocol[AgentInputT, PipelineOutputT]:
         return Pipeline[AgentInputT, PipelineOutputT](
             agents=[self, other],
             input_schema=self.input_schema,

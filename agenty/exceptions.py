@@ -79,3 +79,9 @@ class InvalidStepResponse(PipelineException, InvalidResponse):
     """
 
     pass
+
+
+# Team Exceptions
+
+
+class MaxTurnsExceeded(AgentyException): ...

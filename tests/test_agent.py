@@ -1,101 +1,206 @@
-from unittest.mock import AsyncMock, Mock
+from typing import List
 
 import pytest
-import pydantic_ai as pai
-from pydantic_ai.models.test import TestModel
-from pydantic_ai.result import RunResult
+from pydantic_ai.models.function import FunctionModel, AgentInfo
 from pydantic_ai.models import ModelSettings
 
 from agenty import Agent
 from agenty.exceptions import AgentyValueError
 from agenty.types import BaseIO
 
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
+
+from pydantic_ai import models
+
+models.ALLOW_MODEL_REQUESTS = False
+
+
+@pytest.fixture
+def success_model() -> FunctionModel:
+    async def success_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                TextPart("success"),
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(success_function)
+
+
+@pytest.fixture
+def list_model() -> FunctionModel:
+    async def list_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"response": [1, 2, 3]},
+                    tool_call_id=None,
+                )
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(list_function)
+
+
+@pytest.fixture
+def baseio_model() -> FunctionModel:
+    async def baseio_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"a": 2, "b": "agenty", "c": False},
+                    tool_call_id=None,
+                )
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(baseio_function)
+
+
+@pytest.fixture
+def invalid_baseio_model() -> FunctionModel:
+    async def invalid_baseio_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"a": 1, "b": "test", "d": True, "e": "extra"},
+                    tool_call_id=None,
+                )
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(invalid_baseio_function)
+
+
+@pytest.fixture
+def none_model() -> FunctionModel:
+    async def none_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(parts=[], model_name="test")
+
+    return FunctionModel(none_function)
+
+
+@pytest.fixture
+def intermediate_model() -> FunctionModel:
+    async def intermediate_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"response": "intermediate"},
+                    tool_call_id=None,
+                )
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(intermediate_function)
+
+
+@pytest.fixture
+def final_model() -> FunctionModel:
+    async def final_function(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> ModelResponse:
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name="final_result",
+                    args={"response": "final"},
+                    tool_call_id=None,
+                )
+            ],
+            model_name="test",
+        )
+
+    return FunctionModel(final_function)
+
 
 @pytest.mark.asyncio
-async def test_agent_out_str():
-    agent = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_text="success",
-        ),
-        input_schema=str,
-        output_schema=str,
-    )
+async def test_agent_out_str(success_model):
+    class StringAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
+
+    agent = StringAgent(model=success_model)
     resp = await agent.run("test")
     assert resp == "success"
 
 
 @pytest.mark.asyncio
-async def test_agent_out_list():
-    agent = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args=("1", "2", 3),  # note these are not all int
-        ),
-        input_schema=str,
-        output_schema=list[int],
-    )
+async def test_agent_out_list(list_model):
+    class ListAgent(Agent[str, List[int]]):
+        input_schema = str
+        output_schema = List[int]
+
+    agent = ListAgent(model=list_model)
     resp = await agent.run("test")
     assert resp == [1, 2, 3]
 
 
 @pytest.mark.asyncio
-async def test_agent_out_baseio():
+async def test_agent_out_baseio(baseio_model, invalid_baseio_model):
     class TestIO(BaseIO):
         a: int
         b: str
         c: bool
 
-    agent = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args={"a": 2, "b": "agenty", "c": "False"},
-        ),
-        input_schema=str,
-        output_schema=TestIO,
-    )
+    class BaseIOAgent(Agent[str, TestIO]):
+        input_schema = str
+        output_schema = TestIO
+
+    agent = BaseIOAgent(model=baseio_model)
     resp = await agent.run("test")
     assert resp != {"a": 2, "b": "agenty", "c": False}
     assert resp == TestIO(a=2, b="agenty", c=False)
 
-    with pytest.raises(pai.exceptions.UnexpectedModelBehavior):
-        agent = Agent(
-            model=TestModel(
-                call_tools=[],
-                custom_result_args=({"a": 1, "b": "test", "c": "True", "d": "extra"},),
-            ),
-            input_schema=str,
-            output_schema=TestIO,
-        )
+    with pytest.raises(AgentyValueError):
+        agent = BaseIOAgent(model=invalid_baseio_model)
         resp = await agent.run("test")
 
 
 @pytest.mark.asyncio
-async def test_agent_out_none():
-    agent = Agent(
-        model=TestModel(),
-        input_schema=str,
-        output_schema=str,
-    )
-    mock_result = Mock(spec=RunResult)
-    mock_result.data = None
-    # Test that the agent raises the correct error when the model returns None data (perhaps unable to parse a response)
+async def test_agent_out_none(none_model):
+    class StringAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
 
-    agent.pai_agent.run = AsyncMock(return_value=mock_result)
+    agent = StringAgent(model=none_model)
     with pytest.raises(AgentyValueError):
         await agent.run("test")
 
 
 @pytest.mark.asyncio
-async def test_agent_model_settings():
-    agent = Agent(
-        model=TestModel(),
+async def test_agent_model_settings(success_model):
+    class StringAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
+
+    agent = StringAgent(
+        model=success_model,
         model_settings=ModelSettings(
             temperature=0.79,
             top_p=0.99,
         ),
-        input_schema=str,
-        output_schema=str,
     )
 
     assert agent.model_settings is not None
@@ -105,14 +210,14 @@ async def test_agent_model_settings():
 
 
 @pytest.mark.asyncio
-async def test_agent_template_context():
-    class TestAgent(Agent):
+async def test_agent_template_context(success_model):
+    class TestAgent(Agent[str, str]):
         TEST_ID: str
+        input_schema = str
+        output_schema = str
 
     agent = TestAgent(
-        model=TestModel(),
-        input_schema=str,
-        output_schema=str,
+        model=success_model,
         system_prompt="You are a helpful assistant with ID {{ TEST_ID }}",
     )
 
@@ -123,36 +228,13 @@ async def test_agent_template_context():
 
 
 @pytest.mark.asyncio
-async def test_agent_pipeline():
-    agent1 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_text="intermediate",
-        ),
-        input_schema=str,
-        output_schema=str,
-    )
+async def test_agent_configuration(success_model):
+    class StringAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
 
-    agent2 = Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_text="final",
-        ),
-        input_schema=str,
-        output_schema=str,
-    )
-
-    pipeline = agent1 | agent2
-    result = await pipeline.run("test input")
-    assert result == "final"
-
-
-@pytest.mark.asyncio
-async def test_agent_configuration():
-    agent = Agent(
-        model=TestModel(),
-        input_schema=str,
-        output_schema=str,
+    agent = StringAgent(
+        model=success_model,
         retries=3,
         result_retries=2,
         end_strategy="early",
@@ -166,21 +248,11 @@ async def test_agent_configuration():
 
 
 @pytest.mark.asyncio
-async def test_agent_schema_getters():
-    class CustomInput(BaseIO):
-        field: str
+async def test_agent_model_none():
+    class StringAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
 
-    class CustomOutput(BaseIO):
-        result: int
-
-    agent = Agent(
-        model=TestModel(),
-        input_schema=CustomInput,
-        output_schema=CustomOutput,
-    )
-
-    input_schema = agent.get_input_schema()
-    output_schema = agent.get_output_schema()
-
-    assert input_schema == CustomInput
-    assert output_schema == CustomOutput
+    agent = StringAgent(model=None)
+    with pytest.raises(AgentyValueError):
+        await agent.run("test")

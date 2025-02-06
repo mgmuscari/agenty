@@ -1,9 +1,10 @@
-from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable
+from typing import Any, Optional, Literal, Union, Sequence, overload, Iterable, List
 from collections.abc import MutableSequence
+import json
 import uuid
 
 from openai.types.chat import ChatCompletionMessageParam
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError, PrivateAttr
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -12,8 +13,10 @@ from pydantic_ai.messages import (
     SystemPromptPart,
     TextPart,
 )
+from rich.json import JSON
+
 from agenty.template import apply_template
-from agenty.types import AgentIO, is_sequence_type
+from agenty.types import AgentIO
 import agenty.exceptions as exc
 
 __all__ = ["ChatMessage", "AgentMemory", "Role"]
@@ -45,6 +48,7 @@ class ChatMessage(BaseModel):
     content: AgentIO
     turn_id: Optional[str] = None
     name: Optional[str] = None
+    _inject_name: bool = PrivateAttr(default=False)
 
     def content_str(self, ctx: dict[str, Any] = {}) -> str:
         """Get message content as a string and render Jinja2 template.
@@ -55,7 +59,11 @@ class ChatMessage(BaseModel):
         Returns:
             str: Rendered message content
         """
-        return apply_template(self.content, ctx)
+
+        res = apply_template(self.content, ctx)
+        if self._inject_name and self.name:
+            res = f"[{self.name}] {res}"
+        return res
 
     def to_openai(self, ctx: dict[str, Any] = {}) -> ChatCompletionMessageParam:
         """Convert message to OpenAI API format.
@@ -87,13 +95,39 @@ class ChatMessage(BaseModel):
         """
         match self.role:
             case "user":
-                return ModelRequest(parts=[UserPromptPart(self.content_str(ctx))])
+                return ModelRequest(
+                    parts=[
+                        UserPromptPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case "system":
-                return ModelRequest(parts=[SystemPromptPart(self.content_str(ctx))])
+                return ModelRequest(
+                    parts=[
+                        SystemPromptPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case "assistant":
-                return ModelResponse(parts=[TextPart(self.content_str(ctx))])
+                return ModelResponse(
+                    parts=[
+                        TextPart(
+                            self.content_str(ctx),
+                        )
+                    ]
+                )
             case _:
                 raise ValueError(f"Unsupported role: {self.role}")
+
+    def __rich__(self) -> JSON:
+        """Create a rich console representation of the model.
+
+        Returns:
+            JSON: Rich-formatted JSON representation
+        """
+        return JSON(json.dumps(self.to_openai()))
 
 
 class AgentMemory(MutableSequence[ChatMessage]):
@@ -127,6 +161,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
         role: Role,
         content: AgentIO,
         name: Optional[str] = None,
+        inject_name: bool = False,
     ) -> None:
         """Add a message to history.
 
@@ -147,6 +182,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
             turn_id=self.current_turn_id,
             name=name,
         )
+        message._inject_name = inject_name
         self.append(message)
 
     def clear(self) -> None:
@@ -198,7 +234,10 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """
         return [msg.to_openai(ctx) for msg in self._messages]
 
-    def to_pydantic_ai(self, ctx: dict[str, Any] = {}) -> list[ModelMessage]:
+    def to_pydantic_ai(
+        self,
+        ctx: dict[str, Any] = {},
+    ) -> list[ModelMessage]:
         """Get history in Pydantic-AI format.
 
         Converts all messages in memory to the format expected by Pydantic-AI.
@@ -254,13 +293,11 @@ class AgentMemory(MutableSequence[ChatMessage]):
             TypeError: If value type doesn't match index type
         """
         if isinstance(index, slice):
-            if not is_sequence_type(type(value)):
-                raise exc.AgentyTypeError("Can only assign sequence to slice")
-            for val in value:
-                if not isinstance(val, ChatMessage):
-                    raise exc.AgentyTypeError("Can only assign ChatMessage")
-            if isinstance(value, ChatMessage):
-                raise exc.AgentyTypeError("Can only assign sequence to slice")
+            adapter = TypeAdapter(List[ChatMessage])
+            try:
+                value = adapter.validate_python(value)
+            except ValidationError:
+                raise exc.AgentyTypeError("Can only assign sequence of ChatMessages")
             self._messages[index] = value
         else:
             if not isinstance(value, ChatMessage):
@@ -295,3 +332,27 @@ class AgentMemory(MutableSequence[ChatMessage]):
         """
         self._messages.insert(index, value)
         self._cull_history()
+
+    def __repr__(self) -> str:
+        """Get string representation of memory.
+
+        Returns:
+            str: String representation of memory
+        """
+        return f"AgentMemory({self._messages!r})"
+
+    def __str__(self) -> str:
+        """Get string representation of memory.
+
+        Returns:
+            str: String representation of memory
+        """
+        return f"AgentMemory({self._messages!r})"
+
+    def __rich__(self) -> JSON:
+        """Create a rich console representation of the model.
+
+        Returns:
+            JSON: Rich-formatted JSON representation
+        """
+        return JSON(json.dumps([msg.to_openai() for msg in self._messages]))
