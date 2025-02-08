@@ -50,6 +50,7 @@ AgentInputT = TypeVar(
     "AgentInputT",
     bound=AgentIO,
     default=str,
+    contravariant=True,
 )
 
 AgentOutputT = TypeVar(

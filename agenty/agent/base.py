@@ -6,8 +6,17 @@ import pydantic_ai as pai
 from pydantic_ai.agent import EndStrategy
 
 from agenty.models import infer_model, KnownModelName, Model, ModelSettings
-from agenty.types import AgentInputT, AgentOutputT, AgentIO, NOT_GIVEN, NotGiven
+from agenty.types import (
+    AgentInputT,
+    AgentOutputT,
+    PipelineOutputT,
+    AgentIO,
+    NOT_GIVEN,
+    NotGiven,
+)
 from agenty.template import apply_template
+from agenty.protocol import AgentIOProtocol
+from agenty.pipeline import Pipeline
 
 import agenty.exceptions as exc
 
@@ -137,46 +146,6 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         self.chat_history.add("assistant", output.data, name=name)
         return cast(AgentOutputT, output.data)
 
-        # if input_data is not None:
-        #     _input_data: AgentInputT = input_data
-        #     for input_hook in self._input_hooks:
-        #         _type = type(_input_data)
-        #         _input_data = input_hook(self, _input_data)
-        #         if not isinstance(input_data, _type):
-        #             raise exc.AgentyTypeError(
-        #                 f"Input hook {input_hook.__name__} returned invalid type"
-        #             )
-        #         self.memory.add("user", input_data, name=name)
-
-        # system_prompt = ChatMessage(
-        #     role="system", content=self.system_prompt
-        # ).to_pydantic_ai(ctx=self.template_context())
-
-        # try:
-        #     output = await self.pai_agent.run(
-        #         str(input_data),
-        #         message_history=[system_prompt]
-        #         + self.memory.to_pydantic_ai(ctx=self.template_context()),
-        #         deps=self,
-        #         usage_limits=self.usage_limits[self.model_name],
-        #         usage=self.usage[self.model_name],
-        #     )
-        # except pai.exceptions.UnexpectedModelBehavior as e:
-        #     raise exc.AgentyValueError(e)
-        # if output.data is None:
-        #     raise exc.AgentyValueError("No data returned from agent")
-
-        # for output_hook in self._output_hooks:
-        #     _type = type(output.data)
-        #     output.data = output_hook(self, output.data)
-        #     if not isinstance(output.data, _type):
-        #         raise exc.AgentyValueError(
-        #             f"Output hook {output_hook.__name__} returned invalid type"
-        #         )
-
-        # # self.memory.add("assistant", output.data, name=self.name)
-        # return cast(AgentOutputT, output.data)
-
     @property
     def model_name(self) -> str:
         """Get the name of the current model.
@@ -221,3 +190,24 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
             Dict[str, Any]: Dictionary of variables
         """
         return {key: getattr(self, key) for key in dir(self) if key[0].isupper()}
+
+    def reset(self) -> None:
+        """Reset the agent to its initial state."""
+        self.chat_history.clear()
+
+    def __or__(
+        self, other: AgentIOProtocol[AgentOutputT, PipelineOutputT]
+    ) -> AgentIOProtocol[AgentInputT, PipelineOutputT]:
+        """Chain this agent with another using the | operator.
+
+        Args:
+            other: Another agent to chain with. Its input schema must match this agent's output schema.
+
+        Returns:
+            A new Pipeline instance containing both agents, preserving type information.
+        """
+        return Pipeline[AgentInputT, PipelineOutputT](
+            agents=[self, other],
+            input_schema=self.input_schema,
+            output_schema=other.output_schema,
+        )

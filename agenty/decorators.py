@@ -8,7 +8,7 @@ from pydantic_ai.tools import RunContext, ToolParams
 from typing_extensions import ParamSpec
 
 # Local imports
-from agenty.agent import Agent
+from agenty.agent.base import Agent
 from agenty.types import AgentInputT, AgentOutputT
 
 # Type variables
