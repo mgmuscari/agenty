@@ -44,8 +44,12 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
     end_strategy: EndStrategy = "early"
 
     _pai_agent: Optional[pai.Agent["Agent[AgentInputT, AgentOutputT]", AgentIO]]
-    _input_hooks: List[Callable[[AgentInputT], AgentInputT]]
-    _output_hooks: List[Callable[[AgentOutputT], AgentOutputT]]
+    _input_hooks: List[
+        Callable[["Agent[AgentInputT, AgentOutputT]", AgentInputT], AgentInputT]
+    ]
+    _output_hooks: List[
+        Callable[["Agent[AgentInputT, AgentOutputT]", AgentOutputT], AgentOutputT]
+    ]
 
     def __init__(
         self,
@@ -126,25 +130,41 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
         """
 
         _chat_history = self.chat_history.to_pydantic_ai(ctx=self.template_context())
-        _input_data = str(input_data) if input_data is not None else ""
-        if input_data is not None:
+        _input_data: Any = input_data
+        if _input_data is not None:
+            for input_hook in self._input_hooks:
+                _type: Any = type(_input_data)
+                _input_data = input_hook(self, _input_data)
+                if not isinstance(_input_data, _type):
+                    raise exc.AgentyValueError(
+                        f"Input hook {input_hook.__name__} returned invalid type"
+                    )
             try:
                 TypeAdapter(self.input_schema).validate_python(input_data)
             except ValidationError as e:
                 raise exc.AgentyTypeError(e)
-            self.chat_history.add("user", input_data, name=name)
+            self.chat_history.add("user", _input_data, name=name)
 
         try:
             output = await self.pai_agent.run(
-                _input_data,
+                str(_input_data),
                 message_history=_chat_history,
                 deps=self,
             )
         except pai.exceptions.UnexpectedModelBehavior as e:
             raise exc.InvalidResponse(e)
 
-        self.chat_history.add("assistant", output.data, name=name)
-        return cast(AgentOutputT, output.data)
+        _output_data: Any = output.data
+        for output_hook in self._output_hooks:
+            _type = type(_output_data)
+            _output_data = output_hook(self, _output_data)
+            if not isinstance(_output_data, _type):
+                raise exc.AgentyValueError(
+                    f"Output hook {output_hook.__name__} returned invalid type"
+                )
+
+        self.chat_history.add("assistant", _output_data, name=name)
+        return cast(AgentOutputT, _output_data)
 
     @property
     def model_name(self) -> str:
