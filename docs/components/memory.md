@@ -1,1 +1,0 @@
-::: agenty.components.memory
