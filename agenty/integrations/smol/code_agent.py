@@ -77,7 +77,7 @@ class CodeAgent(Agent[AgentInputT, AgentOutputT]):
             "tools": self.smol_tools + smol_kwargs.get("tools", []),
         }
 
-    async def get_smol_agent(self, **kwargs: Any) -> smol_agents.CodeAgent:
+    async def _get_smol_agent(self, **kwargs: Any) -> smol_agents.CodeAgent:
         """Create a smolagents CodeAgent instance.
 
         Args:
@@ -89,12 +89,12 @@ class CodeAgent(Agent[AgentInputT, AgentOutputT]):
             Configured smolagents CodeAgent instance
         """
         return smol_agents.CodeAgent(
-            model=self.get_smol_model(),
+            model=self._get_smol_model(),
             # system_prompt=self.system_prompt,
             **kwargs,
         )
 
-    def get_smol_model(self) -> smol_models.Model:
+    def _get_smol_model(self) -> smol_models.Model:
         """Convert pydantic-ai model to smolagents model.
 
         Returns:
@@ -172,7 +172,7 @@ class CodeAgent(Agent[AgentInputT, AgentOutputT]):
             InvalidResponse: If response conversion fails
         """
         if self.smol_agent is None:
-            self.smol_agent = await self.get_smol_agent(**self._smol_kwargs)
+            self.smol_agent = await self._get_smol_agent(**self._smol_kwargs)
 
         if input_data is None:
             return cast(AgentOutputT, "")

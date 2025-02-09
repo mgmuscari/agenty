@@ -1,3 +1,4 @@
+import asyncio
 from typing import Generic, Type, Optional, Union, List, Callable, cast, Any, Dict
 import logging
 
@@ -23,7 +24,7 @@ import agenty.exceptions as exc
 from .meta import AgentMeta
 from .chat_history import ChatHistory
 
-__all__ = ["Agent"]
+__all__ = ["Agent", "EndStrategy"]
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,23 @@ class Agent(Generic[AgentInputT, AgentOutputT], metaclass=AgentMeta):
 
         self.chat_history.add("assistant", _output_data, name=name)
         return cast(AgentOutputT, _output_data)
+
+    def run_sync(
+        self,
+        input_data: Optional[AgentInputT],
+        name: Optional[str] = None,
+    ) -> AgentOutputT:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop:
+            return loop.run_until_complete(
+                asyncio.create_task(self.run(input_data, name))
+            )
+        else:
+            return asyncio.run(self.run(input_data, name))
 
     @property
     def model_name(self) -> str:

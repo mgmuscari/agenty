@@ -10,7 +10,7 @@ Any attribute of your agent that starts with a capital letter is automatically a
 
 ```python
 from agenty import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 
 class SimpleGreeter(Agent):
     model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
@@ -38,17 +38,16 @@ class DynamicGreeter(Agent):
     You are a greeter who:
     - Speaks in a {{TONE}} tone
     - Gives {{LENGTH}} responses
-    - Uses {{STYLE}} language
     """
     TONE: str = "friendly"
-    LENGTH: str = "concise"
-    STYLE: str = "casual"
+    LENGTH: str = "medium"
 
-    async def change_personality(self, tone: str, length: str, style: str):
+    async def change_personality(self, tone: str, length: str):
         self.TONE = tone
         self.LENGTH = length
-        self.STYLE = style
 ```
+
+For a complete working example, see [examples/greeter.py](https://github.com/jonchun/agenty/blob/main/examples/greeter.py).
 
 ## Advanced Features
 
@@ -58,10 +57,12 @@ By default, all capitalized attributes are exported as part of the template cont
 You can override this behavior via the `template_context()` method:
 
 ```python
+from datetime import datetime
+
 class CustomContextGreeter(Agent):
     model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
     system_prompt = "Current time: {{current_time}}"
-    
+
     def template_context(self):
         context = super().template_context()
         context["current_time"] = datetime.now().strftime("%H:%M:%S")
@@ -93,86 +94,32 @@ class SpecializedAgent(BaseAgent):
     """
 ```
 
-## Complete Example
-
-Here's a comprehensive example demonstrating templates in action with a weather reporter agent:
-
-```python
-import asyncio
-from datetime import datetime
-from agenty import Agent
-from pydantic_ai.models.openai import OpenAIModel
-
-class WeatherReporter(Agent):
-    model = OpenAIModel("gpt-4o-mini", api_key="your-api-key")
-    
-    # Template variables
-    LOCATION: str = "New York"
-    TEMPERATURE_UNIT: str = "Celsius"
-    DETAIL_LEVEL: str = "basic"
-    TIME_OF_DAY: str = "morning"
-    
-    system_prompt = """
-    You are a weather reporter for {{LOCATION}}.
-    Report temperatures in {{TEMPERATURE_UNIT}}.
-    Provide {{DETAIL_LEVEL}} weather information.
-    
-    Current time period: {{TIME_OF_DAY}}
-    """
-    
-    def template_context(self):
-        context = super().template_context()
-        context["TIME_OF_DAY"] = self._get_time_of_day()
-        return context
-    
-    def _get_time_of_day(self):
-        hour = datetime.now().hour
-        if 5 <= hour < 12:
-            return "morning"
-        elif 12 <= hour < 17:
-            return "afternoon"
-        elif 17 <= hour < 21:
-            return "evening"
-        else:
-            return "night"
-    
-    async def change_location(self, location: str):
-        self.LOCATION = location
-        return await self.run("What's the weather like?")
-
-async def main():
-    reporter = WeatherReporter()
-    
-    # Basic report
-    print(await reporter.run("What's the weather like?"))
-    
-    # Change location and get new report
-    reporter.LOCATION = "Tokyo"
-    reporter.TEMPERATURE_UNIT = "Fahrenheit"
-    reporter.DETAIL_LEVEL = "detailed"
-    
-    print(await reporter.run("What's the weather like?"))
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
 ## Best Practices
 
 1. **Clear Variable Names**
 
-    - Prefer `ALL_CAPS` for template variables
+    - Use `ALL_CAPS` for template variables
     - Choose descriptive names that indicate purpose
+    - Example: `TONE`, `RESPONSE_LENGTH`, `DETAIL_LEVEL`
 
 2. **Maintain Readability**
 
-    - Break long templates into multiple lines
+    - Break long templates into multiple lines using triple quotes
     - Use comments to explain complex template logic
     - Keep template logic simple and maintainable
 
-3. **Validate Variables**
+3. **Variable Management**
 
-    - Ensure all required variables are defined
-    - Provide default values when appropriate
-    - Handle missing variables gracefully
+    - Define all template variables as class attributes
+    - Provide sensible default values
+    - Update variables through methods or direct attribute access
+    - Consider type hints for better code maintainability
 
+4. **Template Structure**
+    - Keep templates focused and single-purpose
+    - Use consistent formatting and indentation
+    - Consider breaking very long templates into smaller, reusable pieces
+
+## Implementation Details
+
+The template system uses Jinja2's SandboxedEnvironment for secure template rendering. Variables are automatically dedented to normalize whitespace. For implementation details, see [agenty/template.py](https://github.com/jonchun/agenty/blob/main/agenty/template.py).

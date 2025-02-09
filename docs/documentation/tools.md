@@ -8,7 +8,7 @@ Here's a simple example of implementing tools in an agent:
 
 ```python
 from agenty import Agent, tool
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 
 class WeatherAgent(Agent):
     model = OpenAIModel("gpt-4o", api_key="your-api-key")
@@ -32,17 +32,22 @@ class WeatherAgent(Agent):
 
 ## Type Safety
 
-Tools support type hints which help ensure correct usage and enable better IDE integration:
+Tools support type hints which help ensure correct usage and enable better IDE integration.
 
 ```python
 from typing import List, Dict
+from agenty.types import BaseIO
+
+class InventoryItem(BaseIO):
+    name: str
+    quantity: int
 
 class InventoryAgent(Agent):
     @tool
     def add_item(self, name: str, quantity: int) -> bool:
         """
         Add an item to inventory.
-        
+
         Args:
             name: The name of the item
             quantity: How many to add
@@ -51,27 +56,34 @@ class InventoryAgent(Agent):
         return True
 
     @tool
-    def get_items(self) -> List[Dict[str, any]]:
+    def get_items(self) -> List[InventoryItem]:
         """Get all items in inventory."""
         return [
-            {"name": "apple", "quantity": 5},
-            {"name": "orange", "quantity": 3}
+            InventoryItem(name="apple", quantity=5),
+            InventoryItem(name="orange", quantity=3)
         ]
 ```
 
 ## Advanced Usage
 
-Tools can be used for more complex operations and can work with structured data:
+Tools can be used for more complex operations and can work with structured data. Here's an example demonstrating async tools and optional parameters:
 
 ```python
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
+from agenty.types import BaseIO
+
+class Appointment(BaseIO):
+    date: datetime
+    description: str
+    duration_minutes: int
+    attendees: Optional[List[str]] = None
 
 class SchedulerAgent(Agent):
     def __init__(self):
         super().__init__()
-        self.appointments = {}
+        self.appointments: Dict[datetime, Appointment] = {}
 
     @tool
     async def schedule_appointment(
@@ -92,16 +104,17 @@ class SchedulerAgent(Agent):
         """
         if date in self.appointments:
             return False
-            
-        self.appointments[date] = {
-            "description": description,
-            "duration": duration_minutes,
-            "attendees": attendees or []
-        }
+
+        self.appointments[date] = Appointment(
+            date=date,
+            description=description,
+            duration_minutes=duration_minutes,
+            attendees=attendees or []
+        )
         return True
 
     @tool
-    def list_appointments(self, date: Optional[datetime] = None) -> List[Dict]:
+    def list_appointments(self, date: Optional[datetime] = None) -> List[Appointment]:
         """
         List appointments, optionally filtered by date.
 
@@ -110,31 +123,27 @@ class SchedulerAgent(Agent):
         """
         if date:
             return [
-                {"time": dt, **details}
-                for dt, details in self.appointments.items()
+                appointment
+                for dt, appointment in self.appointments.items()
                 if dt.date() == date.date()
             ]
-        return [
-            {"time": dt, **details}
-            for dt, details in self.appointments.items()
-        ]
+        return list(self.appointments.values())
 ```
 
 ## Example: Roulette
 
-Here's an example that demonstrates tools in action with a roulette game:
-
 ```python
-from typing import Tuple
+import random
+from typing import Tuple, Any
 from agenty import Agent, tool
 from agenty.types import BaseIO
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 
 class PlayerInfo(BaseIO):
     name: str
     balance: float
 
-class RouletteAgent(Agent[str, str]):
+class RouletteAgent(Agent):
     input_schema = str
     output_schema = str
     model = OpenAIModel("gpt-4o", api_key="your-api-key")
@@ -144,8 +153,13 @@ class RouletteAgent(Agent[str, str]):
         "player's name in responses to make it more personal."
     )
 
-    def __init__(self, player_name: str, starting_balance: float = 100.0):
-        super().__init__()
+    def __init__(
+        self,
+        player_name: str,
+        starting_balance: float = 100.0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
         self.player_name = player_name
         self.balance = starting_balance
         self.current_bet = 0.0
@@ -158,7 +172,13 @@ class RouletteAgent(Agent[str, str]):
 
     @tool
     def place_bet(self, amount: float, number: int) -> bool:
-        """Place a bet on a specific number."""
+        """
+        Place a bet on a specific number.
+
+        Args:
+            amount: How much money to bet
+            number: Which number to bet on (0-36)
+        """
         if amount > self.balance or not 0 <= number <= 36:
             return False
         self.current_bet = amount
@@ -168,14 +188,21 @@ class RouletteAgent(Agent[str, str]):
 
     @tool
     def spin_wheel(self) -> Tuple[int, bool]:
-        """Spin the wheel and return (winning number, whether player won)."""
+        """
+        Spin the wheel and return (winning number, whether player won).
+
+        Returns:
+            A tuple of (winning number, whether player won)
+        """
         winning_number = random.randint(0, 36)
         won = False
+
         if self.current_bet > 0 and self.bet_number == winning_number:
             self.balance += self.current_bet * 35
             won = True
         self.current_bet = 0
         self.bet_number = None
+
         return winning_number, won
 ```
 
@@ -184,29 +211,33 @@ For a complete runnable implementation with a rich console interface and proper 
 ## Best Practices
 
 1. **Clear Documentation**
-   - Write detailed docstrings for each tool
-   - Include parameter descriptions and return value information
-   - Document any side effects or important behaviors
+
+    - Write detailed docstrings for each tool
+    - Include parameter descriptions and return value information
+    - Document any side effects or important behaviors
 
 2. **Type Safety**
-   - Use type hints for all parameters and return values
-   - Consider using more specific types than `any` where possible
-   - Validate input parameters when necessary
+
+    - Use type hints for all parameters and return values
+    - Leverage `agenty.types.BaseIO` for structured data
+    - Validate input parameters when necessary
 
 3. **Error Handling**
-   - Return clear success/failure indicators
-   - Handle edge cases gracefully
-   - Provide meaningful error messages or status codes
+
+    - Return clear success/failure indicators
+    - Handle edge cases gracefully
+    - Provide meaningful error messages or status codes
 
 4. **State Management**
-   - Keep track of state changes in instance variables
-   - Consider thread safety for shared resources
-   - Reset state appropriately between operations
+
+    - Keep track of state changes in instance variables
+    - Consider thread safety for shared resources
+    - Reset state appropriately between operations
 
 5. **Tool Design**
-   - Keep tools focused and single-purpose
-   - Use descriptive names that indicate the tool's function
-   - Consider breaking complex operations into multiple tools
-   - Make tools reusable across different agent implementations
+    - Keep tools focused and single-purpose
+    - Use descriptive names that indicate the tool's function
+    - Consider breaking complex operations into multiple tools
+    - Make tools reusable across different agent implementations
 
 You can read more about the underlying implementation in the [pydantic-ai function tools documentation](https://ai.pydantic.dev/tools/).

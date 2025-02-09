@@ -42,51 +42,50 @@ class UserExtractor(Agent[str, List[User]]):
     system_prompt = "Extract user information from the text"
 ```
 
+For a complete implementation, see [extract_users.py](https://github.com/jonchun/agenty/blob/main/examples/extract_users.py) in the examples directory.
+
 ## Working with Sequences
 
-Extracting a list of data is an extremely common task. You can work with sequences (lists) of any supported type:
+Extracting a list of data is an extremely common task. You can work with sequences (lists) of any supported type. Here's an example from [news_pipeline.py](https://github.com/jonchun/agenty/blob/main/examples/news_pipeline.py):
 
 ```python
-from typing import List, Dict
+from typing import List
 from agenty.types import BaseIO
+from agenty import Agent
 
-class NewsArticle(BaseIO):
+class Article(BaseIO):
     title: str
     content: str
-    tags: List[str]
+    source: str
 
-class NewsAggregator(Agent[str, List[NewsArticle]]):
+class ArticleExtractor(Agent[str, List[Article]]):
     input_schema = str
-    output_schema = List[NewsArticle]
-    system_prompt = "Extract news articles from the text"
+    output_schema = List[Article]
+    system_prompt = "Extract articles from the news feed."
 
-async def main():
-    agent = NewsAggregator()
-    text = """
-    Breaking: New AI Breakthrough
-    Scientists announce major progress in machine learning...
-    #tech #ai #research
+# Usage
+news_feed = """
+Breaking: Tech giant launches new AI model
+In a surprising move, the company revealed their latest...
 
-    Weather Update: Storm Warning
-    Coastal areas prepare for incoming storm system...
-    #weather #safety
-    """
-    articles = await agent.run(text)
+Market Update: Stocks reach record high
+Global markets continued their upward trend as...
+"""
+articles = await ArticleExtractor().run(news_feed)
 
-    for article in articles:
-        print(f"Title: {article.title}")
-        print(f"Tags: {', '.join(article.tags)}")
-        print()
+for article in articles:
+    print(f"Title: {article.title}")
+    print(f"Content: {article.content}")
+    print()
 ```
 
-## Complex Data
+## Complex Data Structures
 
-You can create nested structures for more complex data:
+You can create nested structures for more complex data. Here's an example from [nested_data_structures.py](https://github.com/jonchun/agenty/blob/main/examples/nested_data_structures.py):
 
 ```python
 from typing import List, Optional
 from agenty.types import BaseIO
-from agenty.agent import Agent
 
 class Address(BaseIO):
     street: str
@@ -111,18 +110,17 @@ class ProfileAnalyzer(Agent[str, Person]):
     system_prompt = "Extract detailed profile information"
 
 # Example usage:
+text = """
+John Smith, 34, lives at 123 Main St, Boston, USA 02108.
+He can be reached at john@email.com or (555) 123-4567.
+John enjoys hiking, photography, and cooking.
 """
-profile = await ProfileAnalyzer().run(
-    '''John Smith, 34, lives at 123 Main St, Boston, USA 02108.
-    He can be reached at john@email.com or (555) 123-4567.
-    John enjoys hiking, photography, and cooking.'''
-)
+profile = await ProfileAnalyzer().run(text)
 
 # Access nested data with type safety
 print(f"Name: {profile.name}")         # John Smith
 print(f"City: {profile.address.city}") # Boston
 print(f"Email: {profile.contact.email}") # john@email.com
-"""
 ```
 
 ## Transformers
@@ -229,7 +227,7 @@ class WeatherStation(Agent[str, Temperature]):
 
 ### Custom Validation
 
-You can add custom validation to your models:
+BaseIO objects are Pydantic Models. You can add custom validation to your models:
 
 ```python
 from pydantic import validator
@@ -260,10 +258,12 @@ BaseIO models automatically support rich console output:
 ```python
 from agenty.types import BaseIO
 from rich.console import Console
+
 class User(BaseIO):
     name: str
     age: int
     email: str
+
 console = Console()
 user = User(name="Alice", age=30, email="alice@example.com")
 console.print(user)

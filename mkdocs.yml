@@ -17,17 +17,17 @@ nav:
   - Templates: documentation/templates.md
   - Tools: documentation/tools.md
 - Integrations:
-  - smolagents: integrations/smol.md
+  - smolagents: documentation/integrations/smol.md
 - API Reference:
-  - Core: agenty.md
-  - Decorators: decorators.md
-  - Components:
-    - Memory: components/memory.md
-    - Usage: components/usage.md
-  - Integrations:
-    - smol: integrations/smol-api.md
-  - Exceptions: exceptions.md
-  - Types: types.md
+  - agent: api/agenty.md
+  - decorators: api/decorators.md
+  - exceptions: api/exceptions.md
+  - integrations:
+    - smol: api/integrations/smol.md
+  - pipeline: api/pipeline.md
+  - protocol: api/protocol.md
+  - template: api/template.md
+  - types: api/types.md
 
 # Theme configuration
 theme:
