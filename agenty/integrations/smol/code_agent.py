@@ -1,29 +1,19 @@
 import asyncio
-import json
 import os
-from typing import Dict, List, Any, cast, Optional, Union
+from typing import Dict, List, Any, cast, Optional
 from pydantic.type_adapter import TypeAdapter
 from pydantic import ValidationError
 from agenty import Agent
-from agenty.exceptions import UnsupportedModel, InvalidResponse, AgentyTypeError
+from agenty.exceptions import UnsupportedModel, AgentyTypeError
 from agenty.types import (
     AgentInputT,
     AgentOutputT,
-    BaseIO,
 )
 
 try:
-    from smolagents.agents import (
-        CODE_SYSTEM_PROMPT,
-        CodeAgent as smolCodeAgent,
-        Tool as smolTool,
-    )
-    from smolagents.models import (
-        Model as smolModel,
-        OpenAIServerModel,
-        LiteLLMModel,
-    )
-    from smolagents.agent_types import AgentText
+    import smolagents.agents as smol_agents  # type: ignore
+    import smolagents.models as smol_models  # type: ignore
+    from smolagents.agent_types import AgentText  # type: ignore
 except ImportError as _import_error:
     raise ImportError(
         "Please install `smolagents` to use this integration: "
@@ -31,7 +21,7 @@ except ImportError as _import_error:
     ) from _import_error
 
 
-class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
+class CodeAgent(Agent[AgentInputT, AgentOutputT]):
     """Agent that uses smolagents CodeAgent for code-related tasks.
 
     This agent wraps smolagents.CodeAgent to provide code generation, analysis,
@@ -57,14 +47,14 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
     smol_planning_interval: int | None = None
     smol_use_e2b_executor: bool = False
     smol_max_print_outputs_length: int | None = None
-    smol_tools: List[smolTool] = []
+    smol_tools: List[smol_agents.Tool] = []
     smol_verbosity_level: int = 0
 
-    system_prompt = CODE_SYSTEM_PROMPT
+    system_prompt = ""
     input_schema = str
     output_schema = str
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the SmolCodeAgent.
 
         Args:
@@ -73,7 +63,7 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
             **kwargs: Keyword arguments passed to parent Agent class
         """
         # Extract smol-specific kwargs
-        smol_kwargs = {}
+        smol_kwargs: Dict[str, Any] = {}
         for key in list(kwargs):
             if key.startswith("smol_"):
                 smol_kwargs[key[5:]] = kwargs.pop(key)
@@ -87,7 +77,7 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
             "tools": self.smol_tools + smol_kwargs.get("tools", []),
         }
 
-    async def get_smol_agent(self, **kwargs: Any) -> smolCodeAgent:
+    async def _get_smol_agent(self, **kwargs: Any) -> smol_agents.CodeAgent:
         """Create a smolagents CodeAgent instance.
 
         Args:
@@ -98,13 +88,13 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         Returns:
             Configured smolagents CodeAgent instance
         """
-        return smolCodeAgent(
-            model=self.get_smol_model(),
-            system_prompt=self.system_prompt,
+        return smol_agents.CodeAgent(
+            model=self._get_smol_model(),
+            # system_prompt=self.system_prompt,
             **kwargs,
         )
 
-    def get_smol_model(self) -> smolModel:
+    def _get_smol_model(self) -> smol_models.Model:
         """Convert pydantic-ai model to smolagents model.
 
         Returns:
@@ -120,22 +110,23 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
         from pydantic_ai.models.mistral import MistralModel
         from pydantic_ai.models.cohere import CohereModel
 
+        model_name = self.model_name.split(":")[-1]
         if isinstance(pai_model, OpenAIModel):
-            return OpenAIServerModel(
-                model_id=self.model_name,
+            return smol_models.OpenAIServerModel(
+                model_id=model_name,
                 api_key=pai_model.client.api_key,
                 api_base=str(pai_model.client.base_url),
                 organization=pai_model.client.organization,
                 project=pai_model.client.project,
             )
         elif isinstance(pai_model, AnthropicModel):
-            return LiteLLMModel(
-                model_id=f"anthropic/{self.model_name}",
+            return smol_models.LiteLLMModel(
+                model_id=f"anthropic/{model_name}",
                 api_key=pai_model.client.api_key,
             )
         elif isinstance(pai_model, GroqModel):
-            return LiteLLMModel(
-                model_id=f"groq/{self.model_name}",
+            return smol_models.LiteLLMModel(
+                model_id=f"groq/{model_name}",
                 api_key=pai_model.client.api_key,
             )
         elif isinstance(pai_model, CohereModel):
@@ -144,7 +135,7 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
                 raise UnsupportedModel(
                     f"Unable to automatically fetch API key for {type(pai_model)}. Set COHERE_API_KEY via environment variable instead."
                 )
-            return LiteLLMModel(
+            return smol_models.LiteLLMModel(
                 model_id=f"{self.model_name}",
                 api_key=cohere_key,
             )
@@ -156,8 +147,8 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
                 raise UnsupportedModel(
                     f"Unable to automatically fetch API key for {type(pai_model)}. Set MISTRAL_API_KEY via environment variable instead."
                 )
-            return LiteLLMModel(
-                model_id=f"mistral/{self.model_name}",
+            return smol_models.LiteLLMModel(
+                model_id=f"mistral/{model_name}",
                 api_key=mistral_key.api_key,
             )
         else:
@@ -181,14 +172,14 @@ class SmolCodeAgent(Agent[AgentInputT, AgentOutputT]):
             InvalidResponse: If response conversion fails
         """
         if self.smol_agent is None:
-            self.smol_agent = await self.get_smol_agent(**self._smol_kwargs)
+            self.smol_agent = await self._get_smol_agent(**self._smol_kwargs)
 
         if input_data is None:
             return cast(AgentOutputT, "")
 
         input_str = str(input_data)
-        self.memory.add("user", input_str)
-        resp = await asyncio.to_thread(self.smol_agent.run, input_str)
+        self.chat_history.add("user", input_str)
+        resp = await asyncio.to_thread(self.smol_agent.run, input_str)  # type: ignore
 
         if isinstance(resp, AgentText):
             resp = resp.to_string()

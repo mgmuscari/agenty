@@ -29,8 +29,8 @@ async def test_hooks_in_agent():
     )
     assert hasattr(agent, "_input_hooks")
     assert hasattr(agent, "_output_hooks")
-    assert len(agent._input_hooks) == 1
-    assert len(agent._output_hooks) == 1
+    assert len(agent._input_hooks) == 1  # type: ignore
+    assert len(agent._output_hooks) == 1  # type: ignore
 
 
 @pytest.mark.asyncio
@@ -54,10 +54,10 @@ async def test_hooks_transform_input_output():
         input_schema=str,
         output_schema=str,
     )
-    result = agent._input_hooks[0](agent, "test")
+    result = agent._input_hooks[0](agent, "test")  # type: ignore
     assert result == "prefix_test"
 
-    result = agent._output_hooks[0](agent, "test")
+    result = agent._output_hooks[0](agent, "test")  # type: ignore
     assert result == "test_suffix"
 
 
@@ -93,15 +93,15 @@ async def test_multiple_hooks_order():
     )
 
     # Input hooks are called in reverse order of definition
-    result = agent._input_hooks[0](agent, "test")  # second_prefix
+    result = agent._input_hooks[0](agent, "test")  # type: ignore
     assert result == "second_test"
-    result = agent._input_hooks[1](agent, "test")  # add_prefix
+    result = agent._input_hooks[1](agent, "test")  # type: ignore
     assert result == "custom_test"
 
     # Output hooks are called in reverse order of definition
-    result = agent._output_hooks[0](agent, "test")  # add_second_suffix
+    result = agent._output_hooks[0](agent, "test")  # type: ignore
     assert result == "test_second"
-    result = agent._output_hooks[1](agent, "test")  # add_suffix
+    result = agent._output_hooks[1](agent, "test")  # type: ignore
     assert result == "test_first"
 
 
@@ -124,7 +124,7 @@ async def test_hooks_can_access_instance_attributes():
         output_schema=str,
     )
     agent.prefix = "modified"
-    result = agent._input_hooks[0](agent, "test")
+    result = agent._input_hooks[0](agent, "test")  # type: ignore
     assert result == "modified_test"
 
 

@@ -1,12 +1,12 @@
 from types import FrameType
-from typing import Optional
+from typing import Optional, Any
 import asyncio
 import atexit
 import os
 import readline
 import signal
 
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 from rich.console import Console
 
 from agenty import Agent
@@ -30,7 +30,7 @@ class ChatAgent(Agent[str, str]):
         "You are a helpful and friendly AI assistant named {{ AGENT_NAME }}."
     )
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.AGENT_NAME: str = "Agenty"
 
@@ -39,9 +39,8 @@ async def main() -> None:
     console = Console()
     agent = ChatAgent()
     console.print("Basic Chatbot | Type /exit or /quit to exit")
-    user_prompt = "\033[1;36mUser: \033[0m"  # Use raw ANSI code here because console.input() doesn't work correctly with chat history
     while True:
-        user_input = await async_input(user_prompt)
+        user_input = await async_input("User: ")
         if user_input.lower() in ["/exit", "/quit"]:
             console.print("[yellow]Exiting chat...[/yellow]")
             break

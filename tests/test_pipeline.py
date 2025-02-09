@@ -1,181 +1,208 @@
-from typing import List
+from typing import Optional
+
 import pytest
-from unittest.mock import AsyncMock
 
-from pydantic_ai.models.test import TestModel
-
-from agenty import Agent
-from agenty.exceptions import AgentyTypeError
-from agenty.types import BaseIO
-from agenty.pipeline import Pipeline
+from agenty import Agent, Pipeline
+from agenty.exceptions import AgentyTypeError, AgentyValueError
+from agenty.models import FunctionModel
+from tests.conftest import FakeInput, FakeOutput
 
 
-class User(BaseIO):
-    """Test user model for pipeline testing."""
+class StringAgent(Agent[str, str]):
+    """Basic string-to-string agent for testing."""
 
-    first_name: str
-    last_name: str
-
-
-@pytest.fixture
-def test_users() -> List[dict]:
-    """Fixture providing test user data."""
-    return [
-        {"first_name": "John", "last_name": "Doe"},
-        {"first_name": "Agenty", "last_name": "Rocks"},
-    ]
+    input_schema = str
+    output_schema = str
 
 
-@pytest.fixture
-def user_names() -> List[str]:
-    """Fixture providing expected user name strings."""
-    return ["John Doe", "Agenty Rocks"]
+def test_pipeline_initialization(str_test_model: FunctionModel):
+    """Test pipeline initialization with different parameters.
 
-
-@pytest.fixture
-def user_extractor(test_users) -> Agent[str, List[User]]:
-    """Fixture providing an agent that extracts user objects."""
-    return Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args=test_users,
-        ),
-        input_schema=str,
-        output_schema=List[User],
+    Verifies that pipelines can be initialized:
+    - Empty (no agents)
+    - With agents
+    - With custom input/output schemas
+    """
+    # Test empty pipeline
+    pipeline = Pipeline()
+    assert len(pipeline.agents) == 0, "Empty pipeline should have no agents"
+    assert pipeline.current_step is None, "Empty pipeline should have no current step"
+    assert len(pipeline.output_history) == 0, (
+        "Empty pipeline should have no output history"
     )
 
+    # Test pipeline with agents
+    agent = StringAgent()
+    pipeline = Pipeline(agents=[agent])
+    assert len(pipeline.agents) == 1, "Pipeline should have one agent"
 
-@pytest.fixture
-def name_formatter(user_names) -> Agent[List[User], List[str]]:
-    """Fixture providing an agent that formats user objects to strings."""
-    return Agent(
-        model=TestModel(
-            call_tools=[],
-            custom_result_args=user_names,
-        ),
-        input_schema=List[User],
-        output_schema=List[str],
-    )
+    # Test pipeline with custom schemas
+    pipeline = Pipeline(input_schema=FakeInput, output_schema=FakeOutput)
+    assert pipeline.input_schema == FakeInput, "Input schema should match"
+    assert pipeline.output_schema == FakeOutput, "Output schema should match"
 
 
 @pytest.mark.asyncio
-class TestPipeline:
-    """Test suite for Pipeline functionality."""
+async def test_empty_pipeline():
+    """Test that running an empty pipeline raises an error."""
+    pipeline = Pipeline()
+    with pytest.raises(AgentyValueError):
+        await pipeline.run("test")
 
-    async def test_pipeline_basic_chaining(
-        self, user_extractor: Agent, name_formatter: Agent, user_names: List[str]
-    ):
-        """Test basic pipeline chaining with compatible agents."""
-        pipeline = user_extractor | name_formatter
-        result = await pipeline.run("test input")
-        assert result == user_names
-        assert isinstance(pipeline, Pipeline)
-        assert pipeline.input_schema is str
-        assert pipeline.output_schema == List[str]
 
-    async def test_pipeline_type_validation_error(
-        self, user_extractor: Agent, test_users: List[dict]
-    ):
-        """Test pipeline raises error when agent schemas are incompatible."""
-        incompatible_agent = Agent(
-            model=TestModel(
-                call_tools=[],
-                custom_result_args=test_users,
-            ),
-            input_schema=str,  # Should be List[User]
-            output_schema=List[str],
-        )
+@pytest.mark.asyncio
+async def test_simple_pipeline(str_test_model: FunctionModel):
+    """Test pipeline with a single string agent.
 
-        pipeline = user_extractor | incompatible_agent
-        with pytest.raises(AgentyTypeError) as exc_info:
-            await pipeline.run("test input")
-        assert "Input data type" in str(exc_info.value)
+    Verifies:
+    - Basic pipeline execution
+    - Output history tracking
+    - Pipeline state reset between runs
+    """
+    agent = StringAgent(model=str_test_model)
+    pipeline = Pipeline(agents=[agent])
 
-    @pytest.mark.parametrize(
-        "input_data,expected",
-        [
-            ("", []),  # Empty input
-            ("test", [1.0]),  # Normal input
-        ],
+    # Test failure case
+    result = await pipeline.run("test")
+    assert result == "failure: test", "Failed input should include failure message"
+    assert len(pipeline.output_history) == 1, "Output history should have one entry"
+    assert pipeline.current_step == 0, "Current step should be 0"
+
+    # Test success case (agents are reset between pipeline runs)
+    result = await pipeline.run("agenty")
+    assert result == "success: agenty", (
+        "Successful input should include success message"
     )
-    async def test_multi_agent_pipeline(self, input_data: str, expected: List[float]):
-        """Test pipeline with multiple agents and different data types."""
-        agent1 = Agent[str, int](
-            model=TestModel(call_tools=[], custom_result_args=1),
-            input_schema=str,
-            output_schema=int,
-        )
-        agent2 = Agent[int, float](
-            model=TestModel(call_tools=[], custom_result_args=1.0),
-            input_schema=int,
-            output_schema=float,
-        )
-        agent3 = Agent[float, List[float]](
-            model=TestModel(call_tools=[], custom_result_args=expected),
-            input_schema=float,
-            output_schema=List[float],
-        )
+    assert "success" in result, "Result should contain success indicator"
+    assert len(pipeline.output_history) == 1, "Output history should have one entry"
+    assert pipeline.current_step == 0, "Current step should be 0"
 
-        pipeline = agent1 | agent2 | agent3
-        result = await pipeline.run(input_data)
-        assert result == expected
 
-    async def test_pipeline_empty_sequence_handling(self):
-        """Test pipeline handles empty sequence inputs/outputs correctly."""
-        agent1 = Agent[str, List[int]](
-            model=TestModel(call_tools=[], custom_result_args=[]),
-            input_schema=str,
-            output_schema=List[int],
-        )
-        agent2 = Agent[List[int], List[str]](
-            model=TestModel(call_tools=[], custom_result_args=[]),
-            input_schema=List[int],
-            output_schema=List[str],
-        )
+@pytest.mark.asyncio
+async def test_schema_pipeline(schema_test_model: FunctionModel):
+    """Test pipeline with schema input/output.
 
-        pipeline = agent1 | agent2
-        result = await pipeline.run("test")
-        assert result == []
+    Verifies that pipelines properly handle:
+    - Custom input/output schemas
+    - Schema validation
+    - Output history tracking
+    """
 
-    async def test_pipeline_error_propagation(self):
-        """Test that pipeline properly propagates errors from agents."""
+    class SchemaAgent(Agent[FakeInput, FakeOutput]):
+        input_schema = FakeInput
+        output_schema = FakeOutput
+        model = schema_test_model
 
-        agent1 = Agent[str, str](
-            model=TestModel(call_tools=[], custom_result_text="pipeline test"),
-            input_schema=str,
-            output_schema=str,
-        )
-        # Confirm step 1 works
-        output = await agent1.run("test")
-        assert output == "pipeline test"
+    agent = SchemaAgent()
+    pipeline = Pipeline[FakeInput, FakeOutput](
+        agents=[agent],
+        input_schema=FakeInput,
+        output_schema=FakeOutput,
+    )
 
-        error_msg = "Test error"
+    input_data = FakeInput(query="agenty", context="0.5")
+    result = await pipeline.run(input_data)
 
-        async def raise_error(*args, **kwargs):
-            raise ValueError(error_msg)
+    assert isinstance(result, FakeOutput), "Result should be FakeOutput instance"
+    assert f"success: {input_data.query}" in result.response, (
+        "Response should contain input query"
+    )
+    assert result.confidence == 0.5, "Confidence should match input context"
+    assert len(pipeline.output_history) == 1, "Output history should have one entry"
+    assert pipeline.current_step == 0, "Current step should be 0"
 
-        test_model = TestModel(call_tools=[])
-        test_agent_model = await test_model.agent_model(
-            function_tools=[],
-            allow_text_result=True,
-            result_tools=[],
-        )
-        test_agent_model.request = raise_error
-        test_model.agent_model = AsyncMock(
-            spec=test_model.agent_model, return_value=test_agent_model
-        )
 
-        agent2 = Agent(
-            model=test_model,
-            input_schema=str,
-            output_schema=str,
-        )
-        # Confirm step 2 fails
-        with pytest.raises(ValueError) as exc_info:
-            await agent2.run("test")
-        assert error_msg in str(exc_info.value)
+@pytest.mark.asyncio
+async def test_pipeline_chaining(str_test_model: FunctionModel):
+    """Test pipeline chaining using the | operator.
 
-        # Confirm pipeline fails with same error
-        with pytest.raises(ValueError) as exc_info:
-            await (agent1 | agent2).run("test")
-        assert error_msg in str(exc_info.value)
+    Verifies that agents can be chained together using the pipeline
+    operator to create a multi-step pipeline.
+    """
+
+    class FirstAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
+        model = str_test_model
+
+    class SecondAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
+        model = str_test_model
+
+    first_agent = FirstAgent()
+    second_agent = SecondAgent()
+
+    pipeline = first_agent | second_agent
+
+    input_data = "agenty PIPELINE"
+    result = await pipeline.run(input_data)
+    assert "success" in result, "Chained pipeline result should contain success"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_type_validation(schema_test_model: FunctionModel):
+    """Test pipeline input/output type validation.
+
+    Verifies that pipelines properly validate input types and
+    raise appropriate errors for invalid inputs.
+    """
+
+    class SchemaAgent(Agent[FakeInput, FakeOutput]):
+        input_schema = FakeInput
+        output_schema = FakeOutput
+        model = schema_test_model
+
+    pipeline = Pipeline(
+        agents=[SchemaAgent()],
+        input_schema=FakeInput,
+        output_schema=FakeOutput,
+    )
+
+    # Test invalid input type
+    with pytest.raises(AgentyTypeError):
+        await pipeline.run("invalid input")  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_pipeline_with_none_input(error_test_model: FunctionModel):
+    """Test pipeline handling of None input.
+
+    Verifies that pipelines properly handle None inputs by raising
+    appropriate type errors.
+    """
+    agent = StringAgent(model=error_test_model)
+    pipeline = Pipeline(agents=[agent])
+
+    with pytest.raises(AgentyTypeError):
+        await pipeline.run(None)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_name_propagation(str_test_model: FunctionModel):
+    """Test that pipeline name is propagated to agents.
+
+    Verifies that names passed to pipeline.run() are correctly
+    propagated to the underlying agents.
+    """
+
+    class NameCheckAgent(Agent[str, str]):
+        input_schema = str
+        output_schema = str
+        received_name: Optional[str] = None
+        model = str_test_model
+
+        async def run(
+            self, input_data: Optional[str], name: Optional[str] = None
+        ) -> str:
+            if input_data is None:
+                raise ValueError("Input data cannot be None")
+            self.received_name = name
+            return input_data
+
+    agent = NameCheckAgent()
+    pipeline = Pipeline(agents=[agent])
+
+    test_name = "test-run-1"
+    await pipeline.run("test", name=test_name)
+    assert agent.received_name == test_name, "Agent should receive pipeline run name"

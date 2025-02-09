@@ -70,7 +70,7 @@ class AgentUsage(MutableMapping[str, Usage]):
         """
         return len(self._usages)
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: object) -> bool:
         return key in self._usages
 
     @property
@@ -173,5 +173,5 @@ class AgentUsageLimits(MutableMapping[str, UsageLimits]):
         """
         return len(self._usage_limits)
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: object) -> bool:
         return key in self._usage_limits

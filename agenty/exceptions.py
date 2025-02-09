@@ -8,9 +8,6 @@ class AgentyException(Exception):
     pass
 
 
-# Value and Type Exceptions
-
-
 class AgentyValueError(AgentyException, ValueError):
     """Exception raised when an invalid value is provided to an Agenty operation.
 
@@ -33,6 +30,17 @@ class AgentyTypeError(AgentyException, TypeError):
     pass
 
 
+class AgentyAttributeError(AgentyException, AttributeError):
+    """Exception raised when an attribute is accessed or modified in an invalid way.
+
+    This exception combines AgentyException with AttributeError to indicate that
+    an attribute was accessed or modified in an invalid way while maintaining the Agenty
+    exception hierarchy.
+    """
+
+    pass
+
+
 class UnsupportedModel(AgentyValueError):
     """Exception raised when attempting to use an unsupported model.
 
@@ -43,9 +51,6 @@ class UnsupportedModel(AgentyValueError):
     pass
 
 
-# Response Exceptions
-
-
 class InvalidResponse(AgentyException):
     """Exception raised when receiving an invalid or unexpected response.
 
@@ -54,9 +59,6 @@ class InvalidResponse(AgentyException):
     """
 
     pass
-
-
-# Pipeline Exceptions
 
 
 class PipelineException(AgentyException):
@@ -79,9 +81,3 @@ class InvalidStepResponse(PipelineException, InvalidResponse):
     """
 
     pass
-
-
-# Team Exceptions
-
-
-class MaxTurnsExceeded(AgentyException): ...

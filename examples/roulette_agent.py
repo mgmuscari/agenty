@@ -1,5 +1,5 @@
 from types import FrameType
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 import asyncio
 import atexit
 import os
@@ -7,7 +7,7 @@ import random
 import readline
 import signal
 
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 from rich.console import Console
 
 from agenty import Agent, tool
@@ -45,7 +45,7 @@ class RouletteAgent(Agent):
         self,
         player_name: str,
         starting_balance: float = 100.0,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.player_name = player_name
@@ -109,10 +109,10 @@ async def main() -> None:
     console.print("[bold green]Welcome to the Roulette Game![/bold green]")
     console.print("Type /exit or /quit to exit")
     console.print(f"Starting balance: ${starting_balance}")
-    user_prompt = "\033[1;36mUser: \033[0m"  # Use raw ANSI code here because console.input() doesn't work correctly with chat history
 
     while True:
-        user_input = await async_input(user_prompt)
+        # console.input doesn't seem to work right with chat history
+        user_input = await async_input("User: ")
         if user_input.lower() in ["/exit", "/quit"]:
             console.print(
                 "[yellow]Thanks for playing! Final balance: ${:.2f}[/yellow]".format(

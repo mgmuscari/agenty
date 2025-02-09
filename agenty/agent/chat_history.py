@@ -19,7 +19,7 @@ from agenty.template import apply_template
 from agenty.types import AgentIO
 import agenty.exceptions as exc
 
-__all__ = ["ChatMessage", "AgentMemory", "Role"]
+__all__ = ["ChatMessage", "ChatHistory", "Role"]
 
 Role = Literal["user", "assistant", "tool", "system", "developer", "function"]
 """Type for message sender roles.
@@ -49,6 +49,14 @@ class ChatMessage(BaseModel):
     turn_id: Optional[str] = None
     name: Optional[str] = None
     _inject_name: bool = PrivateAttr(default=False)
+
+    def set_inject_name(self, inject_name: bool) -> None:
+        """Set whether to inject the name into the message content.
+
+        Args:
+            inject_name: Whether to inject the name into the message content
+        """
+        self._inject_name = inject_name
 
     def content_str(self, ctx: dict[str, Any] = {}) -> str:
         """Get message content as a string and render Jinja2 template.
@@ -130,7 +138,7 @@ class ChatMessage(BaseModel):
         return JSON(json.dumps(self.to_openai()))
 
 
-class AgentMemory(MutableSequence[ChatMessage]):
+class ChatHistory(MutableSequence[ChatMessage]):
     """Manages conversation history for an AI agent.
 
     Implements MutableSequence for list-like access to message history.
@@ -182,7 +190,7 @@ class AgentMemory(MutableSequence[ChatMessage]):
             turn_id=self.current_turn_id,
             name=name,
         )
-        message._inject_name = inject_name
+        message.set_inject_name(inject_name)
         self.append(message)
 
     def clear(self) -> None:

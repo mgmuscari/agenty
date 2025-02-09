@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 from rich.console import Console
 
 from agenty import Agent
@@ -91,4 +91,6 @@ async def main() -> None:
     # Age: 30
     # Hobbies: fitness coaching, working out
 
+
+if __name__ == "__main__":
     asyncio.run(main())

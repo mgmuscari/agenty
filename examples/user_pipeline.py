@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 from rich.console import Console
 
 from agenty import Agent

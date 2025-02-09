@@ -8,7 +8,7 @@ from pydantic_ai.tools import RunContext, ToolParams
 from typing_extensions import ParamSpec
 
 # Local imports
-from agenty.agent import Agent
+from agenty.agent.base import Agent
 from agenty.types import AgentInputT, AgentOutputT
 
 # Type variables
@@ -99,13 +99,10 @@ def tool(
 
     @wraps(func)
     def wrapper(
-        ctx: RunContext[Agent[AgentInputT, AgentOutputT]], *args, **kwargs
-    ) -> Any:
+        ctx: RunContext[Agent[AgentInputT, AgentOutputT]], *args: Any, **kwargs: Any
+    ) -> AgentOutputT:
         self = ctx.deps
-        _func: Callable[
-            Concatenate[Agent[AgentInputT, AgentOutputT], ToolParams],
-            AgentOutputT,
-        ] = cast(
+        _func = cast(
             Callable[
                 Concatenate[Agent[AgentInputT, AgentOutputT], ToolParams],
                 AgentOutputT,
@@ -124,4 +121,4 @@ def tool(
         )
         return result
 
-    return wrapper
+    return cast(Callable[ToolParams, AgentOutputT], wrapper)

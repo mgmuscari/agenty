@@ -2,8 +2,8 @@ import asyncio
 import os
 from typing import List, Optional
 from agenty.types import BaseIO
-from agenty.agent import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from agenty import Agent
+from agenty.models import OpenAIModel
 from rich.console import Console
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-1234")

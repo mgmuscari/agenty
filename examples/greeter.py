@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from agenty import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from agenty.models import OpenAIModel
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-1234")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "http://127.0.0.1:4000")
@@ -61,4 +61,5 @@ async def main():
     # It's big. It's busy. It's full of traffic! That's L.A.
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

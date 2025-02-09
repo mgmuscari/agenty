@@ -8,7 +8,7 @@ from pydantic_ai.messages import (
     TextPart,
 )
 
-from agenty.components.memory import AgentMemory, ChatMessage, Role
+from agenty.agent.chat_history import ChatHistory, ChatMessage, Role
 import agenty.exceptions as exc
 
 
@@ -105,55 +105,55 @@ def test_role_validation() -> None:
         ChatMessage(role="invalid", content="test")  # type: ignore
 
 
-def test_agent_memory_initialization() -> None:
+def test_agent_chat_history_initialization() -> None:
     # Test default initialization
-    memory = AgentMemory()
-    assert len(memory) == 0
-    assert memory.current_turn_id is None
-    assert memory.max_messages == -1
+    chat_history = ChatHistory()
+    assert len(chat_history) == 0
+    assert chat_history.current_turn_id is None
+    assert chat_history.max_messages == -1
 
     # Test with max messages
-    memory = AgentMemory(max_messages=5)
-    assert memory.max_messages == 5
+    chat_history = ChatHistory(max_messages=5)
+    assert chat_history.max_messages == 5
 
     # Test with initial messages
     initial_msgs = [
         ChatMessage(role="user", content="Hello"),
         ChatMessage(role="assistant", content="Hi"),
     ]
-    memory = AgentMemory(messages=initial_msgs)
-    assert len(memory) == 2
-    assert memory[0].content == "Hello"
-    assert memory[1].content == "Hi"
+    chat_history = ChatHistory(messages=initial_msgs)
+    assert len(chat_history) == 2
+    assert chat_history[0].content == "Hello"
+    assert chat_history[1].content == "Hi"
 
 
-def test_agent_memory_turn_management() -> None:
-    memory = AgentMemory()
+def test_agent_chat_history_turn_management() -> None:
+    chat_history = ChatHistory()
 
     # Test turn initialization
-    memory.initialize_turn()
-    turn_id = memory.current_turn_id
+    chat_history.initialize_turn()
+    turn_id = chat_history.current_turn_id
     assert turn_id is not None
 
     # Test messages share turn ID
-    memory.add("user", "Hello")
-    memory.add("assistant", "Hi")
-    assert memory[0].turn_id == turn_id
-    assert memory[1].turn_id == turn_id
+    chat_history.add("user", "Hello")
+    chat_history.add("assistant", "Hi")
+    assert chat_history[0].turn_id == turn_id
+    assert chat_history[1].turn_id == turn_id
 
     # Test end turn
-    memory.end_turn()
-    assert memory.current_turn_id is None
+    chat_history.end_turn()
+    assert chat_history.current_turn_id is None
 
     # Test new turn gets new ID
-    memory.add("user", "How are you?")
-    new_turn_id = memory.current_turn_id
+    chat_history.add("user", "How are you?")
+    new_turn_id = chat_history.current_turn_id
     assert new_turn_id is not None
     assert new_turn_id != turn_id
 
 
-def test_agent_memory_add(
-    agent_memory: AgentMemory,
+def test_agent_chat_history_add(
+    agent_chat_history: ChatHistory,
     system_message: str,
     user_message: str,
     assistant_message: str,
@@ -163,90 +163,90 @@ def test_agent_memory_add(
     user = ChatMessage(role="user", content=user_message, name=user_name)
     assistant = ChatMessage(role="assistant", content=assistant_message)
 
-    agent_memory.add("system", system_message)
-    assert len(agent_memory) == 1
-    agent_memory.add("user", user_message, name=user_name)
-    agent_memory.add("assistant", assistant_message)
-    assert len(agent_memory) == 3
+    agent_chat_history.add("system", system_message)
+    assert len(agent_chat_history) == 1
+    agent_chat_history.add("user", user_message, name=user_name)
+    agent_chat_history.add("assistant", assistant_message)
+    assert len(agent_chat_history) == 3
 
-    assert agent_memory[0].role == system.role
-    assert agent_memory[0].content == system.content
-    assert agent_memory[0].name is None
-    assert agent_memory[0].turn_id is not None
+    assert agent_chat_history[0].role == system.role
+    assert agent_chat_history[0].content == system.content
+    assert agent_chat_history[0].name is None
+    assert agent_chat_history[0].turn_id is not None
 
-    assert agent_memory[1].role == user.role
-    assert agent_memory[1].content == user.content
-    assert agent_memory[1].name == user.name
-    assert agent_memory[1].turn_id == agent_memory[0].turn_id
+    assert agent_chat_history[1].role == user.role
+    assert agent_chat_history[1].content == user.content
+    assert agent_chat_history[1].name == user.name
+    assert agent_chat_history[1].turn_id == agent_chat_history[0].turn_id
 
-    assert agent_memory[2].role == assistant.role
-    assert agent_memory[2].content == assistant.content
-    assert agent_memory[2].name == assistant.name
-    assert agent_memory[2].turn_id == agent_memory[0].turn_id
+    assert agent_chat_history[2].role == assistant.role
+    assert agent_chat_history[2].content == assistant.content
+    assert agent_chat_history[2].name == assistant.name
+    assert agent_chat_history[2].turn_id == agent_chat_history[0].turn_id
 
 
-def test_agent_memory_max(agent_memory_max: AgentMemory) -> None:
-    max_messages = agent_memory_max.max_messages
+def test_agent_chat_history_max(agent_chat_history_max: ChatHistory) -> None:
+    max_messages = agent_chat_history_max.max_messages
 
-    # Fill memory to capacity
+    # Fill chat_history to capacity
     for i in range(max_messages):
-        agent_memory_max.add("developer", str(i))
-        assert agent_memory_max[i].content == str(i)
+        agent_chat_history_max.add("developer", str(i))
+        assert agent_chat_history_max[i].content == str(i)
 
     # Test overflow behavior
-    agent_memory_max.add("developer", "overflow")
-    assert len(agent_memory_max) == max_messages
+    agent_chat_history_max.add("developer", "overflow")
+    assert len(agent_chat_history_max) == max_messages
 
     # Verify FIFO behavior
-    assert agent_memory_max[0].content == "1"  # Oldest message removed
-    assert agent_memory_max[-1].content == "overflow"  # New message at end
+    assert agent_chat_history_max[0].content == "1"  # Oldest message removed
+    assert agent_chat_history_max[-1].content == "overflow"  # New message at end
 
     # Test insert with max messages
-    agent_memory_max.insert(0, ChatMessage(role="user", content="inserted"))
-    assert len(agent_memory_max) == max_messages
+    agent_chat_history_max.insert(0, ChatMessage(role="user", content="inserted"))
+    assert len(agent_chat_history_max) == max_messages
     # We insert at 0, but since the oldest message is at 0, it is immediately removed
-    assert agent_memory_max[0].content == "1"
-    assert agent_memory_max[-1].content == "overflow"
+    assert agent_chat_history_max[0].content == "1"
+    assert agent_chat_history_max[-1].content == "overflow"
 
 
-def test_agent_memory_setitem() -> None:
-    memory = AgentMemory()
+def test_agent_chat_history_setitem() -> None:
+    chat_history = ChatHistory()
     msg1 = ChatMessage(role="user", content="Hello")
     msg2 = ChatMessage(role="assistant", content="Hi")
-    memory.append(msg1)
+    chat_history.append(msg1)
 
     # Test single item assignment
-    memory[0] = msg2
-    assert memory[0].content == "Hi"
+    chat_history[0] = msg2
+    assert chat_history[0].content == "Hi"
 
     # Test slice assignment
-    memory.extend([msg1, msg2])
-    memory[1:] = [msg2, msg1]
-    assert memory[1].content == "Hi"
-    assert memory[2].content == "Hello"
+    chat_history.extend([msg1, msg2])
+    chat_history[1:] = [msg2, msg1]
+    assert chat_history[1].content == "Hi"
+    assert chat_history[2].content == "Hello"
 
     # # Test invalid assignments
     with pytest.raises(exc.AgentyTypeError):
-        memory[0] = "invalid"  # type: ignore
+        chat_history[0] = "invalid"  # type: ignore
 
     with pytest.raises(exc.AgentyTypeError):
-        memory[1:] = ["invalid"]  # type: ignore
+        chat_history[1:] = ["invalid"]  # type: ignore
 
 
-def test_agent_memory_conversion() -> None:
-    memory = AgentMemory()
-    memory.add("user", "Hello {{ NAME }}")
-    memory.add("assistant", "Hi {{ NAME }}")
+def test_agent_chat_history_conversion() -> None:
+    chat_history = ChatHistory()
+    chat_history.add("user", "Hello {{ NAME }}")
+    chat_history.add("assistant", "Hi {{ NAME }}")
 
     # Test OpenAI conversion
     ctx = {"NAME": "Alice"}
-    openai_msgs = memory.to_openai(ctx)
+    openai_msgs = chat_history.to_openai(ctx)
     assert len(openai_msgs) == 2
     assert openai_msgs[0].get("content") == "Hello Alice"
     assert openai_msgs[1].get("content") == "Hi Alice"
 
     # Test Pydantic-AI conversion
-    pai_msgs = memory.to_pydantic_ai(ctx)
+    pai_msgs = chat_history.to_pydantic_ai(ctx)
     assert len(pai_msgs) == 2
     assert isinstance(pai_msgs[0], ModelRequest)
     assert isinstance(pai_msgs[1], ModelResponse)
@@ -256,29 +256,29 @@ def test_agent_memory_conversion() -> None:
     assert pai_msgs[1].parts[0].content == "Hi Alice"
 
 
-def test_memory_clear(
-    agent_memory: AgentMemory,
+def test_chat_history_clear(
+    agent_chat_history: ChatHistory,
     system_message: str,
     user_message: str,
 ):
-    agent_memory.add("system", system_message)
-    agent_memory.add("user", user_message)
+    agent_chat_history.add("system", system_message)
+    agent_chat_history.add("user", user_message)
 
-    assert len(agent_memory) == 2
+    assert len(agent_chat_history) == 2
 
-    agent_memory.clear()
-    assert len(agent_memory) == 0
-    assert agent_memory.current_turn_id is None
-
-
-@pytest.fixture
-def agent_memory():
-    return AgentMemory()
+    agent_chat_history.clear()
+    assert len(agent_chat_history) == 0
+    assert agent_chat_history.current_turn_id is None
 
 
 @pytest.fixture
-def agent_memory_max():
-    return AgentMemory(max_messages=5)
+def agent_chat_history():
+    return ChatHistory()
+
+
+@pytest.fixture
+def agent_chat_history_max():
+    return ChatHistory(max_messages=5)
 
 
 @pytest.fixture

@@ -1,3 +1,4 @@
-from .code_agent import SmolCodeAgent
+from .code_agent import CodeAgent
+from . import tools
 
-__all__ = ["SmolCodeAgent"]
+__all__ = ["CodeAgent", "tools"]

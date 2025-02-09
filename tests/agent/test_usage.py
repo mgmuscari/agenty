@@ -2,7 +2,7 @@
 
 import pytest
 
-from agenty.components.usage import AgentUsage, AgentUsageLimits
+from agenty.agent.usage import AgentUsage, AgentUsageLimits
 from pydantic_ai.usage import Usage, UsageLimits
 
 
@@ -24,7 +24,6 @@ class TestAgentUsage:
 
         # Test __delitem__
         assert "model_a" in agent_usage
-        from devtools import debug
 
         del agent_usage["model_a"]
         assert "model_a" not in agent_usage
