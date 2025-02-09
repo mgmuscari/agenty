@@ -6,10 +6,11 @@ Agenty provides powerful type-safe input and output handling through structured 
 
 The structured I/O system is built on two key concepts:
 
-- `AgentIO`: A union type that supports primitive types and structured objects
-- `BaseIO`: A base class for creating structured data models (built on Pydantic)
+-   `AgentIO`: A union type that supports primitive types and structured objects
+-   `BaseIO`: A base class for creating structured data models (built on Pydantic)
 
 Supported types include:
+
 ```python
 AgentIO = Union[
     bool,          # Boolean values
@@ -65,13 +66,13 @@ async def main():
     Breaking: New AI Breakthrough
     Scientists announce major progress in machine learning...
     #tech #ai #research
-    
+
     Weather Update: Storm Warning
     Coastal areas prepare for incoming storm system...
     #weather #safety
     """
     articles = await agent.run(text)
-    
+
     for article in articles:
         print(f"Title: {article.title}")
         print(f"Tags: {', '.join(article.tags)}")
@@ -124,11 +125,48 @@ print(f"Email: {profile.contact.email}") # john@email.com
 """
 ```
 
+## Transformers
+
+Transformers are lightweight agents that convert data between different types in a type-safe manner. They are particularly useful in pipelines where you need to transform data before or after processing. Simply override the `transform()` method and handle the transformation between data types.
+
+```python
+from typing import Any
+from agenty import Transformer, Agent
+
+# Transform any input to integer
+class IntTransformer(Transformer[Any, int]):
+    async def transform(
+        self,
+        input_data: Any,
+    ) -> int:
+        if input_data is None:
+            raise ValueError("Input data is required")
+        return int(input_data)
+
+# Create a reusable transformer
+to_int = IntTransformer()
+
+# Agent that processes numbers
+class NumberProcessor(Agent[int, str]):
+    input_schema = int
+    output_schema = str
+    system_prompt = "Convert the number to words"
+
+# Create pipeline and run synchronously
+number_processor = to_int | NumberProcessor()
+result = number_processor.run_sync("123")
+```
+
+!!! note
+
+    The above trivial example is purely for demonstration. Pydantic will actually attempt to automatically convert between compatible types and a `to_int()` transformer without any additional logic is not actually very useful.
+
 ## Type Safety and Validation
 
 The structured I/O system provides 2 layers of type safety:
 
 1. **Static Type Checking**: Generics ensure your type checker works as expected:
+
 ```python
 class DataProcessor(Agent[List[int], float]):
     input_schema = List[int]   # Must match first type parameter
@@ -136,14 +174,15 @@ class DataProcessor(Agent[List[int], float]):
 ```
 
 2. **Runtime Validation**: Pydantic-based validation ensures data correctness:
+
 ```python
 class Temperature(BaseIO):
     celsius: float
-    
+
     @property
     def fahrenheit(self) -> float:
         return (self.celsius * 9/5) + 32
-    
+
     @property
     def kelvin(self) -> float:
         return self.celsius + 273.15
@@ -151,19 +190,22 @@ class Temperature(BaseIO):
 class WeatherStation(Agent[str, Temperature]):
     input_schema = str
     output_schema = Temperature
-    
+
     # Invalid data will raise validation errors
     # e.g., if the model returns non-numeric temperature
 ```
 
 ## Best Practices
+
 1. **Type Safety**
+
     - Always specify input_schema and output_schema
     - Use type hints consistently
     - Let static type checkers help catch errors early
     - Handle validation errors gracefully
 
 2. **Pydantic Model Design**
+
     - Keep models focused and single-purpose
     - Use descriptive field names
     - Include type hints for all fields
@@ -171,6 +213,7 @@ class WeatherStation(Agent[str, Temperature]):
     - Consider adding validation methods or properties
 
 3. **Data Validation**
+
     - Add field validators when needed
     - Use Pydantic's built-in validation features
     - Consider adding custom validation methods
