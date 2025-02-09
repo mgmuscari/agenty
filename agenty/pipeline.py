@@ -1,5 +1,5 @@
 from typing import Any, Generic, List, Optional, Type, cast
-
+import asyncio
 from pydantic import TypeAdapter, ValidationError
 
 from agenty.exceptions import AgentyTypeError, AgentyValueError
@@ -118,6 +118,23 @@ class Pipeline(Generic[AgentInputT, AgentOutputT]):
 
         final_output = validate_data(output, self.output_schema, "Pipeline output")
         return cast(AgentOutputT, final_output)
+
+    def run_sync(
+        self,
+        input_data: Optional[AgentInputT],
+        name: Optional[str] = None,
+    ) -> AgentOutputT:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop:
+            return loop.run_until_complete(
+                asyncio.create_task(self.run(input_data, name))
+            )
+        else:
+            return asyncio.run(self.run(input_data, name))
 
     def reset(self) -> None:
         """Reset the pipeline to its initial state."""

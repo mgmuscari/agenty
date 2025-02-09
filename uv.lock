@@ -36,7 +36,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.5,<4" },
     { name = "mcp", specifier = ">=1.2.1" },
     { name = "openai", specifier = ">=1.60.2,<2.0.0" },
-    { name = "pydantic-ai", specifier = ">=0.0.21,<0.0.22" },
+    { name = "pydantic-ai", specifier = ">=0.0.21,<0.1.0" },
     { name = "rich", specifier = ">=13.9.4,<14.0.0" },
     { name = "smolagents", extras = ["litellm"], marker = "extra == 'adapters'", specifier = ">=1.7.0,<2" },
     { name = "smolagents", extras = ["litellm"], marker = "extra == 'smol'", specifier = ">=1.7.0,<2" },
